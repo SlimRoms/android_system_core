@@ -94,6 +94,7 @@
 #define AID_NET_BW_ACCT   3007  /* change bandwidth statistics accounting */
 #define AID_NET_BT_STACK  3008  /* bluetooth: access config files */
 #define AID_QCOM_ONCRPC   3009  /* can read/write /dev/oncrpc files */
+#define AID_QCOM_DIAG     3010  /* can read/write /dev/diag */
 
 #define AID_EVERYBODY     9997  /* shared between all apps in the same profile */
 #define AID_MISC          9998  /* access to misc storage */
@@ -151,6 +152,7 @@ static const struct android_id_info android_ids[] = {
     { "clat",          AID_CLAT, },
     { "loop_radio",    AID_LOOP_RADIO, },
     { "qcom_oncrpc", AID_QCOM_ONCRPC, },
+    { "qcom_diag", AID_QCOM_DIAG, },
     { "mediadrm",      AID_MEDIA_DRM, },
     { "package_info",  AID_PACKAGE_INFO, },
     { "sdcard_pics",   AID_SDCARD_PICS, },
