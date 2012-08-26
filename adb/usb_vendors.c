@@ -123,10 +123,10 @@
 #define VENDOR_ID_INQ_MOBILE    0x2314
 // Sony's USB Vendor ID
 #define VENDOR_ID_SONY          0x054C
-// Lab126's USB Vendor ID
-#define VENDOR_ID_LAB126        0x1949
 // Yulong Coolpad's USB Vendor ID
 #define VENDOR_ID_YULONG_COOLPAD 0x1EBF
+// Lab126's USB Vendor ID
+#define VENDOR_ID_LAB126        0x1949
 
 /** built-in vendor list */
 int builtInVendorIds[] = {
@@ -174,8 +174,8 @@ int builtInVendorIds[] = {
     VENDOR_ID_QUANTA,
     VENDOR_ID_INQ_MOBILE,
     VENDOR_ID_SONY,
-    VENDOR_ID_LAB126,
     VENDOR_ID_YULONG_COOLPAD,
+    VENDOR_ID_LAB126,
 };
 
 #define BUILT_IN_VENDOR_COUNT    (sizeof(builtInVendorIds)/sizeof(builtInVendorIds[0]))

@@ -36,29 +36,6 @@
 
 #include <windows.h>
 
-int64_t file_size(const char *fn)
-{
-    HANDLE    file;
-    char     *data;
-    DWORD     sz;
-
-    file = CreateFile( fn,
-                       GENERIC_READ,
-                       FILE_SHARE_READ,
-                       NULL,
-                       OPEN_EXISTING,
-                       0,
-                       NULL );
-
-    if (file == INVALID_HANDLE_VALUE)
-        return -1;
-
-    sz = GetFileSize( file, NULL );
-    CloseHandle( file );
-
-    return sz;
-}
-
 void get_my_path(char exe[PATH_MAX])
 {
 	char*  r;
@@ -75,7 +52,7 @@ void *load_file(const char *fn, unsigned *_sz)
 {
     HANDLE    file;
     char     *data;
-    DWORD     sz;
+    DWORD     file_size;
 
     file = CreateFile( fn,
                        GENERIC_READ,
@@ -88,29 +65,29 @@ void *load_file(const char *fn, unsigned *_sz)
     if (file == INVALID_HANDLE_VALUE)
         return NULL;
 
-    sz = GetFileSize( file, NULL );
+    file_size = GetFileSize( file, NULL );
     data      = NULL;
 
-    if (sz > 0) {
-        data = (char*) malloc( sz );
+    if (file_size > 0) {
+        data = (char*) malloc( file_size );
         if (data == NULL) {
-            fprintf(stderr, "load_file: could not allocate %ld bytes\n", sz );
-            sz = 0;
+            fprintf(stderr, "load_file: could not allocate %ld bytes\n", file_size );
+            file_size = 0;
         } else {
             DWORD  out_bytes;
 
-            if ( !ReadFile( file, data, sz, &out_bytes, NULL ) ||
-                 out_bytes != sz )
+            if ( !ReadFile( file, data, file_size, &out_bytes, NULL ) ||
+                 out_bytes != file_size )
             {
-                fprintf(stderr, "load_file: could not read %ld bytes from '%s'\n", sz, fn);
+                fprintf(stderr, "load_file: could not read %ld bytes from '%s'\n", file_size, fn);
                 free(data);
                 data      = NULL;
-                sz = 0;
+                file_size = 0;
             }
         }
     }
     CloseHandle( file );
 
-    *_sz = (unsigned) sz;
+    *_sz = (unsigned) file_size;
     return  data;
 }

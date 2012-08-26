@@ -62,8 +62,7 @@ int32_t gglRecipQ(GGLfixed x, int q)
     int shift;
     x = gglRecipQNormalized(x, &shift);
     shift += 16-q;
-    if (shift > 0)
-        x += 1L << (shift-1);   // rounding
+    x += 1L << (shift-1);   // rounding
     x >>= shift;
     return x;
 }    

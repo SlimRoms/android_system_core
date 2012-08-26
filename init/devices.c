@@ -52,7 +52,7 @@
 #define FIRMWARE_DIR2   "/vendor/firmware"
 
 #ifdef HAVE_SELINUX
-extern struct selabel_handle *sehandle;
+static struct selabel_handle *sehandle;
 #endif
 
 static int device_fd = -1;
@@ -219,6 +219,32 @@ static void make_device(const char *path,
     }
 #endif
 }
+
+
+static int make_dir(const char *path, mode_t mode)
+{
+    int rc;
+
+#ifdef HAVE_SELINUX
+    char *secontext = NULL;
+
+    if (sehandle) {
+        selabel_lookup(sehandle, &secontext, path, mode);
+        setfscreatecon(secontext);
+    }
+#endif
+
+    rc = mkdir(path, mode);
+
+#ifdef HAVE_SELINUX
+    if (secontext) {
+        freecon(secontext);
+        setfscreatecon(NULL);
+    }
+#endif
+    return rc;
+}
+
 
 static void add_platform_device(const char *name)
 {

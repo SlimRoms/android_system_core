@@ -23,6 +23,7 @@
 #include <linux/kd.h>
 #include <errno.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <netinet/in.h>
 #include <linux/if.h>
 #include <arpa/inet.h>
@@ -77,61 +78,47 @@ static int write_file(const char *path, const char *value)
     }
 }
 
-static int _open(const char *path)
-{
-    int fd;
-
-    fd = open(path, O_RDONLY | O_NOFOLLOW);
-    if (fd < 0)
-        fd = open(path, O_WRONLY | O_NOFOLLOW);
-
-    return fd;
-}
 
 static int _chown(const char *path, unsigned int uid, unsigned int gid)
 {
-    int fd;
     int ret;
 
-    fd = _open(path);
-    if (fd < 0) {
-        return -1;
-    }
+    struct stat p_statbuf;
 
-    ret = fchown(fd, uid, gid);
+    ret = lstat(path, &p_statbuf);
     if (ret < 0) {
-        int errno_copy = errno;
-        close(fd);
-        errno = errno_copy;
         return -1;
     }
 
-    close(fd);
+    if (S_ISLNK(p_statbuf.st_mode) == 1) {
+        errno = EINVAL;
+        return -1;
+    }
 
-    return 0;
+    ret = chown(path, uid, gid);
+
+    return ret;
 }
 
 static int _chmod(const char *path, mode_t mode)
 {
-    int fd;
     int ret;
 
-    fd = _open(path);
-    if (fd < 0) {
-        return -1;
-    }
+    struct stat p_statbuf;
 
-    ret = fchmod(fd, mode);
+    ret = lstat(path, &p_statbuf);
     if (ret < 0) {
-        int errno_copy = errno;
-        close(fd);
-        errno = errno_copy;
         return -1;
     }
 
-    close(fd);
+    if (S_ISLNK(p_statbuf.st_mode) == 1) {
+        errno = EINVAL;
+        return -1;
+    }
 
-    return 0;
+    ret = chmod(path, mode);
+
+    return ret;
 }
 
 static int insmod(const char *filename, char *options)
@@ -239,9 +226,42 @@ int do_domainname(int nargs, char **args)
     return write_file("/proc/sys/kernel/domainname", args[1]);
 }
 
+/*exec <path> <arg1> <arg2> ... */
+#define MAX_PARAMETERS 64
 int do_exec(int nargs, char **args)
 {
-    return -1;
+    pid_t pid;
+    int status, i, j;
+    char *par[MAX_PARAMETERS];
+    if (nargs > MAX_PARAMETERS)
+    {
+        return -1;
+    }
+    for(i=0, j=1; i<(nargs-1) ;i++,j++)
+    {
+        par[i] = args[j];
+    }
+    par[i] = (char*)0;
+    pid = fork();
+    if (!pid)
+    {
+        char tmp[32];
+        int fd, sz;
+        get_property_workspace(&fd, &sz);
+        sprintf(tmp, "%d,%d", dup(fd), sz);
+        setenv("ANDROID_PROPERTY_WORKSPACE", tmp, 1);
+        execve(par[0],par,environ);
+        exit(0);
+    }
+    else
+    {
+        while (waitpid(pid, &status, 0) == -1 && errno == EINTR);
+        if (WEXITSTATUS(status) != 0) {
+            ERROR("exec: pid %1d exited with return code %d: %s", (int)pid, WEXITSTATUS(status), strerror(status));
+        }
+
+    }
+    return 0;
 }
 
 int do_export(int nargs, char **args)
@@ -291,6 +311,32 @@ int do_insmod(int nargs, char **args)
     return do_insmod_inner(nargs, args, size);
 }
 
+int do_log(int nargs, char **args)
+{
+    char* par[nargs+3];
+    char* value;
+    int i;
+
+    par[0] = "exec";
+    par[1] = "/system/bin/log";
+    par[2] = "-tinit";
+    for (i = 1; i < nargs; ++i) {
+        value = args[i];
+        if (value[0] == '$') {
+            /* system property if value starts with '$' */
+            value++;
+            if (value[0] != '$') {
+                value = (char*) property_get(value);
+                if (!value) value = args[i];
+            }
+        }
+        par[i+2] = value;
+    }
+    par[nargs+2] = NULL;
+
+    return do_exec(nargs+2, par);
+}
+
 int do_mkdir(int nargs, char **args)
 {
     mode_t mode = 0755;
@@ -302,7 +348,7 @@ int do_mkdir(int nargs, char **args)
         mode = strtoul(args[2], 0, 8);
     }
 
-    ret = make_dir(args[1], mode);
+    ret = mkdir(args[1], mode);
     /* chmod in case the directory already exists */
     if (ret == -1 && errno == EEXIST) {
         ret = _chmod(args[1], mode);
@@ -582,8 +628,7 @@ int do_restart(int nargs, char **args)
     struct service *svc;
     svc = service_find_by_name(args[1]);
     if (svc) {
-        service_stop(svc);
-        service_start(svc, NULL);
+        service_restart(svc);
     }
     return 0;
 }
@@ -736,12 +781,26 @@ int do_chmod(int nargs, char **args) {
 }
 
 int do_restorecon(int nargs, char **args) {
+#ifdef HAVE_SELINUX
+    char *secontext = NULL;
+    struct stat sb;
     int i;
 
+    if (is_selinux_enabled() <= 0 || !sehandle)
+        return 0;
+
     for (i = 1; i < nargs; i++) {
-        if (restorecon(args[i]) < 0)
+        if (lstat(args[i], &sb) < 0)
             return -errno;
+        if (selabel_lookup(sehandle, &secontext, args[i], sb.st_mode) < 0)
+            return -errno;
+        if (lsetfilecon(args[i], secontext) < 0) {
+            freecon(secontext);
+            return -errno;
+        }
+        freecon(secontext);
     }
+#endif
     return 0;
 }
 
