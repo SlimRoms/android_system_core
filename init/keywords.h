@@ -8,9 +8,11 @@ int do_class_reset(int nargs, char **args);
 int do_domainname(int nargs, char **args);
 int do_exec(int nargs, char **args);
 int do_export(int nargs, char **args);
+int do_export_rc(int nargs, char **args);
 int do_hostname(int nargs, char **args);
 int do_ifup(int nargs, char **args);
 int do_insmod(int nargs, char **args);
+int do_log(int nargs, char **args);
 int do_mkdir(int nargs, char **args);
 int do_mount_all(int nargs, char **args);
 int do_mount(int nargs, char **args);
@@ -54,12 +56,14 @@ enum {
     KEYWORD(domainname,  COMMAND, 1, do_domainname)
     KEYWORD(exec,        COMMAND, 1, do_exec)
     KEYWORD(export,      COMMAND, 2, do_export)
+    KEYWORD(export_rc,   COMMAND, 1, do_export_rc)
     KEYWORD(group,       OPTION,  0, 0)
     KEYWORD(hostname,    COMMAND, 1, do_hostname)
     KEYWORD(ifup,        COMMAND, 1, do_ifup)
     KEYWORD(insmod,      COMMAND, 1, do_insmod)
     KEYWORD(import,      SECTION, 1, 0)
     KEYWORD(keycodes,    OPTION,  0, 0)
+    KEYWORD(log,         COMMAND, 1, do_log)
     KEYWORD(mkdir,       COMMAND, 1, do_mkdir)
     KEYWORD(mount_all,   COMMAND, 1, do_mount_all)
     KEYWORD(mount,       COMMAND, 3, do_mount)

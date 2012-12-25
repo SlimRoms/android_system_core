@@ -55,13 +55,15 @@ static int ion_ioctl(int fd, int req, void *arg)
 }
 
 int ion_alloc(int fd, size_t len, size_t align, unsigned int heap_mask,
-	      unsigned int flags, struct ion_handle **handle)
+          unsigned int flags, struct ion_handle **handle)
 {
         int ret;
         struct ion_allocation_data data = {
                 .len = len,
                 .align = align,
-		.heap_mask = heap_mask,
+#ifndef OLD_ION_API
+        .heap_mask = heap_mask,
+#endif
                 .flags = flags,
         };
 
@@ -122,16 +124,16 @@ int ion_share(int fd, struct ion_handle *handle, int *share_fd)
 }
 
 int ion_alloc_fd(int fd, size_t len, size_t align, unsigned int heap_mask,
-		 unsigned int flags, int *handle_fd) {
-	struct ion_handle *handle;
-	int ret;
+         unsigned int flags, int *handle_fd) {
+    struct ion_handle *handle;
+    int ret;
 
-	ret = ion_alloc(fd, len, align, heap_mask, flags, &handle);
-	if (ret < 0)
-		return ret;
-	ret = ion_share(fd, handle, handle_fd);
-	ion_free(fd, handle);
-	return ret;
+    ret = ion_alloc(fd, len, align, heap_mask, flags, &handle);
+    if (ret < 0)
+        return ret;
+    ret = ion_share(fd, handle, handle_fd);
+    ion_free(fd, handle);
+    return ret;
 }
 
 int ion_import(int fd, int share_fd, struct ion_handle **handle)
@@ -149,8 +151,12 @@ int ion_import(int fd, int share_fd, struct ion_handle **handle)
 
 int ion_sync_fd(int fd, int handle_fd)
 {
+#ifdef OLD_ION_API
+    return 0;
+#else
     struct ion_fd_data data = {
         .fd = handle_fd,
     };
     return ion_ioctl(fd, ION_IOC_SYNC, &data);
+#endif
 }

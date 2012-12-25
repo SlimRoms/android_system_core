@@ -1,5 +1,6 @@
 /*
  * Copyright 2008, The Android Open Source Project
+ * Copyright (C) 2011, Code Aurora Forum. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); 
  * you may not use this file except in compliance with the License. 
@@ -485,7 +486,7 @@ int ifc_get_info(const char *name, in_addr_t *addr, int *prefixLength, unsigned 
         if(ioctl(ifc_ctl_sock, SIOCGIFNETMASK, &ifr) < 0) {
             *prefixLength = 0;
         } else {
-            *prefixLength = ipv4NetmaskToPrefixLength(
+            *prefixLength = ipv4NetmaskToPrefixLength((int)
                     ((struct sockaddr_in*) &ifr.ifr_addr)->sin_addr.s_addr);
         }
     }
@@ -813,6 +814,8 @@ ifc_configure(const char *ifname,
     property_set(dns_prop_name, dns1 ? ipaddr_to_string(dns1) : "");
     snprintf(dns_prop_name, sizeof(dns_prop_name), "net.%s.dns2", ifname);
     property_set(dns_prop_name, dns2 ? ipaddr_to_string(dns2) : "");
+    snprintf(dns_prop_name, sizeof(dns_prop_name), "net.%s.gw", ifname);
+    property_set(dns_prop_name, gateway ? ipaddr_to_string(gateway) : "");
 
     return 0;
 }
@@ -963,4 +966,22 @@ int ifc_add_route(const char *ifname, const char *dst, int prefix_length, const 
 int ifc_remove_route(const char *ifname, const char*dst, int prefix_length, const char *gw)
 {
     return ifc_act_on_route(SIOCDELRT, ifname, dst, prefix_length, gw);
+}
+
+int ifc_get_mtu(const char *name, int *mtuSz)
+{
+    struct ifreq ifr;
+    ifc_init_ifr(name, &ifr);
+
+    if (mtuSz != NULL) {
+        if(ioctl(ifc_ctl_sock, SIOCGIFMTU, &ifr) < 0) {
+            *mtuSz = 0;
+            return -2;
+        } else {
+            *mtuSz = ifr.ifr_mtu;
+            return 0;
+        }
+    }
+
+    return -1;
 }

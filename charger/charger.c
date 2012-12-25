@@ -65,9 +65,17 @@
 #define LAST_KMSG_PATH          "/proc/last_kmsg"
 #define LAST_KMSG_MAX_SZ        (32 * 1024)
 
+#if 1
 #define LOGE(x...) do { KLOG_ERROR("charger", x); } while (0)
 #define LOGI(x...) do { KLOG_INFO("charger", x); } while (0)
 #define LOGV(x...) do { KLOG_DEBUG("charger", x); } while (0)
+#else
+#define LOG_NDEBUG 0
+#define LOG_TAG "charger"
+#include <cutils/log.h>
+#endif
+
+#define SYS_POWER_STATE "/sys/power/state"
 
 struct key_state {
     bool pending;
@@ -292,6 +300,28 @@ err:
     return -1;
 }
 
+static int write_file(const char *path, char *buf, size_t sz)
+{
+    int fd;
+    size_t cnt;
+
+    fd = open(path, O_WRONLY, 0);
+    if (fd < 0)
+        goto err;
+
+    cnt = write(fd, buf, sz);
+    if (cnt <= 0)
+        goto err;
+
+    close(fd);
+    return cnt;
+
+err:
+    if (fd >= 0)
+        close(fd);
+    return -1;
+}
+
 static int get_battery_capacity(struct charger *charger)
 {
     int ret;
@@ -422,6 +452,12 @@ static void process_ps_uevent(struct charger *charger, struct uevent *uevent)
         strlcpy(ps_type, uevent->ps_type, sizeof(ps_type));
     }
 
+#ifdef BATTERY_DEVICE_NAME
+        // We only want to look at one device
+        if (strcmp(BATTERY_DEVICE_NAME, uevent->ps_name) != 0)
+            return;
+#endif
+
     if (!strncmp(ps_type, "Battery", 7))
         battery = true;
 
@@ -443,7 +479,7 @@ static void process_ps_uevent(struct charger *charger, struct uevent *uevent)
             }
             /* only pick up the first battery for now */
             if (battery && !charger->battery)
-                charger->battery = supply;
+                    charger->battery = supply;
         } else {
             LOGE("supply '%s' already exists..\n", uevent->ps_name);
         }
@@ -458,7 +494,6 @@ static void process_ps_uevent(struct charger *charger, struct uevent *uevent)
         if (!supply) {
             LOGE("power supply '%s' not found ('%s' %d)\n",
                  uevent->ps_name, ps_type, online);
-            return;
         }
     } else {
         return;
@@ -466,13 +501,16 @@ static void process_ps_uevent(struct charger *charger, struct uevent *uevent)
 
     /* allow battery to be managed in the supply list but make it not
      * contribute to online power supplies. */
+#ifndef BATTERY_DEVICE_NAME
     if (!battery) {
+#endif
         if (was_online && !online)
             charger->num_supplies_online--;
         else if (supply && !was_online && online)
             charger->num_supplies_online++;
+#ifndef BATTERY_DEVICE_NAME
     }
-
+#endif
     LOGI("power supply %s (%s) %s (action=%s num_online=%d num_supplies=%d)\n",
          uevent->ps_name, ps_type, battery ? "" : online ? "online" : "offline",
          uevent->action, charger->num_supplies_online, charger->num_supplies);
@@ -660,6 +698,9 @@ static void redraw_screen(struct charger *charger)
 
 static void kick_animation(struct animation *anim)
 {
+#ifdef ALLOW_SUSPEND_IN_CHARGER
+    write_file(SYS_POWER_STATE, "on", strlen("on"));
+#endif
     anim->run = true;
 }
 
@@ -684,6 +725,9 @@ static void update_screen_state(struct charger *charger, int64_t now)
         reset_animation(batt_anim);
         charger->next_screen_transition = -1;
         gr_fb_blank(true);
+#ifdef ALLOW_SUSPEND_IN_CHARGER
+        write_file(SYS_POWER_STATE, "mem", strlen("mem"));
+#endif
         LOGV("[%lld] animation done\n", now);
         return;
     }
@@ -827,6 +871,9 @@ static void process_key(struct charger *charger, int code, int64_t now)
             if (key->pending)
                 kick_animation(charger->batt_anim);
         }
+    } else {
+        if (key->pending)
+            kick_animation(charger->batt_anim);
     }
 
     key->pending = false;
@@ -835,6 +882,7 @@ static void process_key(struct charger *charger, int code, int64_t now)
 static void handle_input_state(struct charger *charger, int64_t now)
 {
     process_key(charger, KEY_POWER, now);
+    process_key(charger, KEY_HOME, now);
 
     if (charger->next_key_check != -1 && now > charger->next_key_check)
         charger->next_key_check = -1;
