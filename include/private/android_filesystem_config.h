@@ -72,6 +72,7 @@
 #define AID_CLAT          1029  /* clat part of nat464 */
 #define AID_LOOP_RADIO    1030  /* loop radio devices */
 #define AID_MEDIA_DRM     1031  /* MediaDrm plugins */
+#define AID_AUDIT         1032  /* audit daemon */
 #define AID_PACKAGE_INFO  1032  /* access to installed package details */
 #define AID_SDCARD_PICS   1033  /* external storage photos access */
 #define AID_SDCARD_AV     1034  /* external storage audio/video access */
@@ -177,6 +178,7 @@ static const struct android_id_info android_ids[] = {
     { "everybody",     AID_EVERYBODY, },
     { "misc",          AID_MISC, },
     { "nobody",        AID_NOBODY, },
+    { "audit",      AID_AUDIT, },
 };
 
 #define android_id_count \
