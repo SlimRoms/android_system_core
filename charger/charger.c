@@ -748,7 +748,8 @@ static void update_screen_state(struct charger *charger, int64_t now)
         write_file(SYS_POWER_STATE, "mem", strlen("mem"));
 #endif
         LOGV("[%lld] animation done\n", now);
-        request_suspend(true);
+        if (charger->num_supplies_online > 0)
+            request_suspend(true);
         return;
     }
 
