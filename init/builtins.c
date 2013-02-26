@@ -555,6 +555,33 @@ exit_success:
 
 }
 
+#define PFF_BLOCKDEV_GUESS "/dev/block/platform/sdhci-tegra.3/by-name/ISD"
+#define PFF_SOURCE_EXT4 "/fstab.endeavoru.ext4"
+#define PFF_SOURCE_VFAT "/fstab.endeavoru.vfat"
+#define PFF_DESTINATION "/fstab.endeavoru" /* must match ro.hardware */
+void symlink_fstab_file()
+{
+    int fd = -1;
+    unsigned char bytes[3] = {0};
+
+    if ((fd = open(PFF_BLOCKDEV_GUESS, O_RDONLY)) < 0)
+        goto early_exit;
+
+    read(fd, bytes, 3);
+    close(fd);
+
+    if(bytes[0] != 0xeb && bytes[2] != 0x90) {
+        /* does NOT look like vfat -> ext4 maybe? */
+        symlink(PFF_SOURCE_EXT4, PFF_DESTINATION);
+    }
+    else {
+        symlink(PFF_SOURCE_VFAT, PFF_DESTINATION);
+    }
+
+early_exit:
+    while(0) {}
+}
+
 int do_mount_all(int nargs, char **args)
 {
     pid_t pid;
@@ -566,6 +593,11 @@ int do_mount_all(int nargs, char **args)
     if (nargs != 2) {
         return -1;
     }
+
+    /* symlink the correct fstab file to /fstab.$ro.hardware to support multiple
+     * storage layouts in the same ROM build
+    */
+    symlink_fstab_file();
 
     /*
      * Call fs_mgr_mount_all() to mount all filesystems.  We fork(2) and
