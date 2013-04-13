@@ -352,6 +352,9 @@ extern int recovery_mode;
 #define CS_UNAUTHORIZED 7
 
 extern const char *adb_device_banner;
+
+#define CS_ONLINE    10 /* recovery or device */
+
 extern int HOST;
 extern int SHELL_EXIT_NOTIFY_FD;
 
