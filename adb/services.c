@@ -398,7 +398,7 @@ static int create_subproc_thread(const char *name)
     else {
         shell_command = SHELL_COMMAND;
     }
-
+    
     if(name) {
         ret_fd = create_subprocess(shell_command, "-c", name, &pid);
     } else {

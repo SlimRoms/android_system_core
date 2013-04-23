@@ -5,8 +5,8 @@
 #include <sys/klog.h>
 #include <string.h>
 
-#define FALLBACK_KLOG_BUF_SHIFT    17    /* CONFIG_LOG_BUF_SHIFT from our kernel */
-#define FALLBACK_KLOG_BUF_LEN    (1 << FALLBACK_KLOG_BUF_SHIFT)
+#define FALLBACK_KLOG_BUF_SHIFT	17	/* CONFIG_LOG_BUF_SHIFT from our kernel */
+#define FALLBACK_KLOG_BUF_LEN	(1 << FALLBACK_KLOG_BUF_SHIFT)
 
 int dmesg_main(int argc, char **argv)
 {
@@ -45,13 +45,13 @@ int dmesg_main(int argc, char **argv)
 
     while((ret = write(STDOUT_FILENO, p, n))) {
         if (ret == -1) {
-        if (errno == EINTR)
+	    if (errno == EINTR)
                 continue;
-        perror("write");
-        return EXIT_FAILURE;
-    }
-    p += ret;
-    n -= ret;
+	    perror("write");
+	    return EXIT_FAILURE;
+	}
+	p += ret;
+	n -= ret;
     }
 
     return 0;

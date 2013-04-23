@@ -27,6 +27,7 @@ public:
 
     /* 1 out of errorRate will be dropped */
     int errorRate;
+
 private:
     int mCommandCount;
     bool mWithSeq;

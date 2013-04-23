@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-#ifndef _DEBUGGERD_TOMBSTONE_H
-#define _DEBUGGERD_TOMBSTONE_H
+#include <cutils/memory.h>
 
-#include <stddef.h>
-#include <stdbool.h>
-#include <sys/types.h>
+/* Use mips-assembler versions supplied by bionic/libc/arch-mips/string/memset.S: */
+void _memset16(uint16_t* dst, uint16_t value, size_t size);
+void _memset32(uint32_t* dst, uint32_t value, size_t size);
 
-#include <corkscrew/ptrace.h>
+void android_memset16(uint16_t* dst, uint16_t value, size_t size)
+{
+    _memset16(dst, value, size);
+}
 
-/* Creates a tombstone file and writes the crash dump to it.
- * Returns the path of the tombstone, which must be freed using free(). */
-char* engrave_tombstone(pid_t pid, pid_t tid, int signal, uintptr_t abort_msg_address,
-        bool dump_sibling_threads, bool quiet, bool* detach_failed, int* total_sleep_time_usec);
-
-#endif // _DEBUGGERD_TOMBSTONE_H
+void android_memset32(uint32_t* dst, uint32_t value, size_t size)
+{
+    _memset32(dst, value, size);
+}

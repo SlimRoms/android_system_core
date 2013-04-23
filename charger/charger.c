@@ -894,6 +894,11 @@ static void process_key(struct charger *charger, int code, int64_t now)
                 kick_animation(charger->batt_anim);
             }
         }
+    } else {
+        if (key->pending) {
+            request_suspend(false);
+            kick_animation(charger->batt_anim);
+        }
     }
 
     key->pending = false;

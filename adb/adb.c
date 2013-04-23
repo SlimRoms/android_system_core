@@ -25,6 +25,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <stdint.h>
 
 #include "sysdeps.h"
 #include "adb.h"
@@ -34,7 +35,7 @@
 
 #if !ADB_HOST
 #include <private/android_filesystem_config.h>
-#include <linux/capability.h>
+//#include <sys/capability.h>
 #include <linux/prctl.h>
 #include <sys/mount.h>
 #else
@@ -400,6 +401,10 @@ static char *connection_state_name(atransport *t)
         return "bootloader";
     case CS_DEVICE:
         return "device";
+    case CS_RECOVERY:
+        return "recovery";
+    case CS_SIDELOAD:
+        return "sideload";
     case CS_OFFLINE:
         return "offline";
     default:
@@ -991,6 +996,7 @@ int launch_server(int server_port)
     /* message since the pipe handles must be inheritable, we use a     */
     /* security attribute                                               */
     HANDLE                pipe_read, pipe_write;
+    HANDLE                stdout_handle, stderr_handle;
     SECURITY_ATTRIBUTES   sa;
     STARTUPINFO           startup;
     PROCESS_INFORMATION   pinfo;
@@ -1009,6 +1015,26 @@ int launch_server(int server_port)
     }
 
     SetHandleInformation( pipe_read, HANDLE_FLAG_INHERIT, 0 );
+
+    /* Some programs want to launch an adb command and collect its output by
+     * calling CreateProcess with inheritable stdout/stderr handles, then
+     * using read() to get its output. When this happens, the stdout/stderr
+     * handles passed to the adb client process will also be inheritable.
+     * When starting the adb server here, care must be taken to reset them
+     * to non-inheritable.
+     * Otherwise, something bad happens: even if the adb command completes,
+     * the calling process is stuck while read()-ing from the stdout/stderr
+     * descriptors, because they're connected to corresponding handles in the
+     * adb server process (even if the latter never uses/writes to them).
+     */
+    stdout_handle = GetStdHandle( STD_OUTPUT_HANDLE );
+    stderr_handle = GetStdHandle( STD_ERROR_HANDLE );
+    if (stdout_handle != INVALID_HANDLE_VALUE) {
+        SetHandleInformation( stdout_handle, HANDLE_FLAG_INHERIT, 0 );
+    }
+    if (stderr_handle != INVALID_HANDLE_VALUE) {
+        SetHandleInformation( stderr_handle, HANDLE_FLAG_INHERIT, 0 );
+    }
 
     ZeroMemory( &startup, sizeof(startup) );
     startup.cb = sizeof(startup);

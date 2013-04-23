@@ -37,7 +37,7 @@
 #include <cutils/logd.h>
 #include <cutils/log.h>
 
-#define LOG_BUF_SIZE    1024
+#define LOG_BUF_SIZE	1024
 
 #if FAKE_LOG_DEVICE
 // This will be defined when building for the host.
@@ -113,14 +113,14 @@ static int prio_fallback = ANDROID_LOG_INFO;
  * swapped-the-strings errors.
  */
 
-#define    LOGGING_PREFIX    "log.tag."
-#define    LOGGING_DEFAULT    "log.tag.DEFAULT"
+#define	LOGGING_PREFIX	"log.tag."
+#define	LOGGING_DEFAULT	"log.tag.DEFAULT"
 
 int __android_log_loggable(int prio, const char *tag)
 {
     int nprio;
 
-#if    HAVE_LIBC_SYSTEM_PROPERTIES
+#if	HAVE_LIBC_SYSTEM_PROPERTIES
     char keybuf[PROP_NAME_MAX];
     char results[PROP_VALUE_MAX];
     int n;
@@ -134,47 +134,47 @@ int __android_log_loggable(int prio, const char *tag)
     n = 0;
     results[0] = '\0';
     if (tag) {
-    memcpy (keybuf, LOGGING_PREFIX, strlen (LOGGING_PREFIX) + 1);
-    /* watch out for buffer overflow */
-    strncpy (keybuf + strlen (LOGGING_PREFIX), tag,
-         sizeof (keybuf) - strlen (LOGGING_PREFIX));
-    keybuf[sizeof (keybuf) - 1] = '\0';
-    n = __system_property_get (keybuf, results);
+	memcpy (keybuf, LOGGING_PREFIX, strlen (LOGGING_PREFIX) + 1);
+	/* watch out for buffer overflow */
+	strncpy (keybuf + strlen (LOGGING_PREFIX), tag,
+		 sizeof (keybuf) - strlen (LOGGING_PREFIX));
+	keybuf[sizeof (keybuf) - 1] = '\0';
+	n = __system_property_get (keybuf, results);
     }
     if (n == 0) {
-    /* nothing yet, look for the global */
-    memcpy (keybuf, LOGGING_DEFAULT, sizeof (LOGGING_DEFAULT));
-    n = __system_property_get (keybuf, results);
+	/* nothing yet, look for the global */
+	memcpy (keybuf, LOGGING_DEFAULT, sizeof (LOGGING_DEFAULT));
+	n = __system_property_get (keybuf, results);
     }
 
     if (n == 0) {
-    nprio = prio_fallback;
+	nprio = prio_fallback;
     } else {
-    switch (results[0])
-    {
-    case 'E':
-        nprio = ANDROID_LOG_ERROR;
-        break;
-    case 'W':
-        nprio = ANDROID_LOG_WARN;
-        break;
-    case 'I':
-        nprio = ANDROID_LOG_INFO;
-        break;
-    case 'D':
-        nprio = ANDROID_LOG_DEBUG;
-        break;
-    case 'V':
-        nprio = ANDROID_LOG_VERBOSE;
-        break;
-    case 'S':
-        nprio = ANDROID_LOG_SILENT;
-        break;
-    default:
-        /* unspecified or invalid */
-        nprio = prio_fallback;
-        break;
-    }
+	switch (results[0])
+	{
+	case 'E':
+	    nprio = ANDROID_LOG_ERROR;
+	    break;
+	case 'W':
+	    nprio = ANDROID_LOG_WARN;
+	    break;
+	case 'I':
+	    nprio = ANDROID_LOG_INFO;
+	    break;
+	case 'D':
+	    nprio = ANDROID_LOG_DEBUG;
+	    break;
+	case 'V':
+	    nprio = ANDROID_LOG_VERBOSE;
+	    break;
+	case 'S':
+	    nprio = ANDROID_LOG_SILENT;
+	    break;
+	default:
+	    /* unspecified or invalid */
+	    nprio = prio_fallback;
+	    break;
+	}
     }
 #else
     /* no system property routines, fallback to a default */
@@ -249,6 +249,7 @@ int __android_log_write(int prio, const char *tag, const char *msg)
 {
     struct iovec vec[3];
     log_id_t log_id = LOG_ID_MAIN;
+    char tmp_tag[32];
 
     if (!tag)
         tag = "";
@@ -272,9 +273,13 @@ int __android_log_write(int prio, const char *tag, const char *msg)
         !strncmp(tag, "QC-ONCRPC", 9) ||
         !strncmp(tag, "QC-DSI", 6) ||
         !strcmp(tag, "QC-NETMGR-LIB") ||
-        !strcmp(tag, "QC-QDP")
-        )
+        !strcmp(tag, "QC-QDP") ||
+        !strcmp(tag, "Diag_Lib")) {
             log_id = LOG_ID_RADIO;
+            // Inform third party apps/ril/radio.. to use Rlog or RLOG
+            snprintf(tmp_tag, sizeof(tmp_tag), "use-Rlog/RLOG-%s", tag);
+            tag = tmp_tag;
+    }
 
     vec[0].iov_base   = (unsigned char *) &prio;
     vec[0].iov_len    = 1;
@@ -289,12 +294,14 @@ int __android_log_write(int prio, const char *tag, const char *msg)
 int __android_log_buf_write(int bufID, int prio, const char *tag, const char *msg)
 {
     struct iovec vec[3];
+    char tmp_tag[32];
 
     if (!tag)
         tag = "";
 
     /* XXX: This needs to go! */
-    if (!strcmp(tag, "HTC_RIL") ||
+    if ((bufID != LOG_ID_RADIO) &&
+         (!strcmp(tag, "HTC_RIL") ||
         !strncmp(tag, "RIL", 3) || /* Any log tag with "RIL" as the prefix */
         !strncmp(tag, "IMS", 3) || /* Any log tag with "IMS" as the prefix */
         !strcmp(tag, "AT") ||
@@ -310,9 +317,12 @@ int __android_log_buf_write(int bufID, int prio, const char *tag, const char *ms
         !strncmp(tag, "QC-RIL", 6) ||
         !strncmp(tag, "QC-QMI", 6) ||
         !strncmp(tag, "QC-ONCRPC", 9) ||
-        !strncmp(tag, "QC-DSI", 6)
-        )
+        !strncmp(tag, "QC-DSI", 6))) {
             bufID = LOG_ID_RADIO;
+            // Inform third party apps/ril/radio.. to use Rlog or RLOG
+            snprintf(tmp_tag, sizeof(tmp_tag), "use-Rlog/RLOG-%s", tag);
+            tag = tmp_tag;
+    }
 
     vec[0].iov_base   = (unsigned char *) &prio;
     vec[0].iov_len    = 1;
@@ -358,7 +368,7 @@ int __android_log_buf_print(int bufID, int prio, const char *tag, const char *fm
 }
 
 void __android_log_assert(const char *cond, const char *tag,
-              const char *fmt, ...)
+			  const char *fmt, ...)
 {
     char buf[LOG_BUF_SIZE];
 
