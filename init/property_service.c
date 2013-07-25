@@ -27,6 +27,7 @@
 
 #include <cutils/misc.h>
 #include <cutils/sockets.h>
+#include <cutils/multiuser.h>
 
 #define _REALLY_INCLUDE_SYS__SYSTEM_PROPERTIES_H_
 #include <sys/_system_properties.h>
@@ -40,10 +41,8 @@
 #include <sys/atomics.h>
 #include <private/android_filesystem_config.h>
 
-#ifdef HAVE_SELINUX
 #include <selinux/selinux.h>
 #include <selinux/label.h>
-#endif
 
 #include "property_service.h"
 #include "init.h"
@@ -143,7 +142,7 @@ static int init_workspace(workspace *w, size_t size)
         /* dev is a tmpfs that we can use to carve a shared workspace
          * out of, so let's do that...
          */
-    fd = open("/dev/__properties__", O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
+    fd = open(PROP_FILENAME, O_RDWR | O_CREAT | O_NOFOLLOW, 0644);
     if (fd < 0)
         return -1;
 
@@ -156,11 +155,9 @@ static int init_workspace(workspace *w, size_t size)
 
     close(fd);
 
-    fd = open("/dev/__properties__", O_RDONLY | O_NOFOLLOW);
+    fd = open(PROP_FILENAME, O_RDONLY | O_NOFOLLOW);
     if (fd < 0)
         return -1;
-
-    unlink("/dev/__properties__");
 
     w->data = data;
     w->size = size;
@@ -219,7 +216,6 @@ static void update_prop_info(prop_info *pi, const char *value, unsigned len)
 
 static int check_mac_perms(const char *name, char *sctx)
 {
-#ifdef HAVE_SELINUX
     if (is_selinux_enabled() <= 0)
         return 1;
 
@@ -243,15 +239,10 @@ static int check_mac_perms(const char *name, char *sctx)
     freecon(tctx);
  err:
     return result;
-
-#endif
-    return 1;
 }
 
 static int check_control_mac_perms(const char *name, char *sctx)
 {
-#ifdef HAVE_SELINUX
-
     /*
      *  Create a name prefix out of ctl.<service name>
      *  The new prefix allows the use of the existing
@@ -265,9 +256,6 @@ static int check_control_mac_perms(const char *name, char *sctx)
         return 0;
 
     return check_mac_perms(ctl_name, sctx);
-
-#endif
-    return 1;
 }
 
 /*
@@ -301,11 +289,18 @@ static int check_control_perms(const char *name, unsigned int uid, unsigned int 
 static int check_perms(const char *name, unsigned int uid, unsigned int gid, char *sctx)
 {
     int i;
+    unsigned int app_id;
+
     if(!strncmp(name, "ro.", 3))
         name +=3;
 
     if (uid == 0)
         return check_mac_perms(name, sctx);
+
+    app_id = multiuser_get_app_id(uid);
+    if (app_id == AID_BLUETOOTH) {
+        uid = app_id;
+    }
 
     for (i = 0; property_perms[i].prefix; i++) {
         if (strncmp(property_perms[i].prefix, name,
@@ -414,11 +409,9 @@ int property_set(const char *name, const char *value)
          * to prevent them from being overwritten by default values.
          */
         write_persistent_property(name, value);
-#ifdef HAVE_SELINUX
     } else if (strcmp("selinux.reload_policy", name) == 0 &&
                strcmp("1", value) == 0) {
         selinux_reload_policy();
-#endif
     }
     property_changed(name, value);
     return 0;
@@ -460,9 +453,7 @@ void handle_property_set_fd()
         msg.name[PROP_NAME_MAX-1] = 0;
         msg.value[PROP_VALUE_MAX-1] = 0;
 
-#ifdef HAVE_SELINUX
         getpeercon(s, &source_ctx);
-#endif
 
         if(memcmp(msg.name,"ctl.",4) == 0) {
             // Keep the old close-socket-early behavior when handling
@@ -487,10 +478,7 @@ void handle_property_set_fd()
             // the property is written to memory.
             close(s);
         }
-#ifdef HAVE_SELINUX
         freecon(source_ctx);
-#endif
-
         break;
 
     default:
@@ -572,6 +560,18 @@ static void load_persistent_properties()
             }
             if (fstat(fd, &sb) < 0) {
                 ERROR("fstat on property file \"%s\" failed errno: %d\n", entry->d_name, errno);
+                close(fd);
+                continue;
+            }
+
+            // File must not be accessible to others, be owned by root/root, and
+            // not be a hard link to any other file.
+            if (((sb.st_mode & (S_IRWXG | S_IRWXO)) != 0)
+                    || (sb.st_uid != 0)
+                    || (sb.st_gid != 0)
+                    || (sb.st_nlink != 1)) {
+                ERROR("skipping insecure property file %s (uid=%lu gid=%lu nlink=%d mode=%o)\n",
+                      entry->d_name, sb.st_uid, sb.st_gid, sb.st_nlink, sb.st_mode);
                 close(fd);
                 continue;
             }

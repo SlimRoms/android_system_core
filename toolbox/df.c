@@ -28,7 +28,7 @@ static void printsize(long long n)
     printf("%4lld.%1lld%c", t/10, t%10, unit);
     }
     else {
-    printf("%4lld%c", t/10, unit);
+    printf("%4lld.%1lld%c", t/10, t%10, unit);
     }
 }
 

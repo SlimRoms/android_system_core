@@ -203,7 +203,7 @@ static int read_request(int fd, debugger_request_t* out_request) {
     pollfds[0].revents = 0;
     status = TEMP_FAILURE_RETRY(poll(pollfds, 1, 3000));
     if (status != 1) {
-        LOG("timed out reading tid\n");
+        LOG("timed out reading tid (from pid=%d uid=%d)\n", cr.pid, cr.uid);
         return -1;
     }
 
@@ -211,13 +211,15 @@ static int read_request(int fd, debugger_request_t* out_request) {
     memset(&msg, 0, sizeof(msg));
     status = TEMP_FAILURE_RETRY(read(fd, &msg, sizeof(msg)));
     if (status < 0) {
-        LOG("read failure? %s\n", strerror(errno));
+        LOG("read failure? %s (pid=%d uid=%d)\n",
+            strerror(errno), cr.pid, cr.uid);
         return -1;
     }
     if (status == sizeof(debugger_msg_t)) {
         XLOG("crash request of size %d abort_msg_address=%#08x\n", status, msg.abort_msg_address);
     } else {
-        LOG("invalid crash request of size %d\n", status);
+        LOG("invalid crash request of size %d (from pid=%d uid=%d)\n",
+            status, cr.pid, cr.uid);
         return -1;
     }
 
@@ -250,7 +252,7 @@ static int read_request(int fd, debugger_request_t* out_request) {
             return -1;
         }
     } else {
-        /* No one else is not allowed to dump arbitrary processes. */
+        /* No one else is allowed to dump arbitrary processes. */
         return -1;
     }
     return 0;
@@ -318,7 +320,8 @@ static void handle_request(int fd) {
                                     &total_sleep_time_usec);
                         } else if (request.action == DEBUGGER_ACTION_DUMP_BACKTRACE) {
                             XLOG("stopped -- dumping to fd\n");
-                            dump_backtrace(fd, request.pid, request.tid, &detach_failed,
+                            dump_backtrace(fd, -1,
+                                    request.pid, request.tid, &detach_failed,
                                     &total_sleep_time_usec);
                         } else {
                             XLOG("stopped -- continuing\n");

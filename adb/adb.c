@@ -35,7 +35,7 @@
 
 #if !ADB_HOST
 #include <private/android_filesystem_config.h>
-//#include <sys/capability.h>
+#include <sys/capability.h>
 #include <linux/prctl.h>
 #include <sys/mount.h>
 #else
@@ -326,7 +326,7 @@ static void send_connect(atransport *t)
     send_packet(cp, t);
 }
 
-static void send_auth_request(atransport *t)
+void send_auth_request(atransport *t)
 {
     D("Calling send_auth_request\n");
     apacket *p;
@@ -407,6 +407,8 @@ static char *connection_state_name(atransport *t)
         return "sideload";
     case CS_OFFLINE:
         return "offline";
+    case CS_UNAUTHORIZED:
+        return "unauthorized";
     default:
         return "unknown";
     }
@@ -536,6 +538,7 @@ void handle_packet(apacket *p, atransport *t)
 
     case A_AUTH:
         if (p->msg.arg0 == ADB_AUTH_TOKEN) {
+            t->connection_state = CS_UNAUTHORIZED;
             t->key = adb_auth_nextkey(t->key);
             if (t->key) {
                 send_auth_response(p->data, p->msg.data_length, t);
@@ -988,6 +991,33 @@ void start_device_log(void)
 #endif
 
 #if ADB_HOST
+
+#ifdef WORKAROUND_BUG6558362
+#include <sched.h>
+#define AFFINITY_ENVVAR "ADB_CPU_AFFINITY_BUG6558362"
+void adb_set_affinity(void)
+{
+   cpu_set_t cpu_set;
+   const char* cpunum_str = getenv(AFFINITY_ENVVAR);
+   char* strtol_res;
+   int cpu_num;
+
+   if (!cpunum_str || !*cpunum_str)
+       return;
+   cpu_num = strtol(cpunum_str, &strtol_res, 0);
+   if (*strtol_res != '\0')
+     fatal("bad number (%s) in env var %s. Expecting 0..n.\n", cpunum_str, AFFINITY_ENVVAR);
+
+   sched_getaffinity(0, sizeof(cpu_set), &cpu_set);
+   D("orig cpu_set[0]=0x%08lx\n", cpu_set.__bits[0]);
+   CPU_ZERO(&cpu_set);
+   CPU_SET(cpu_num, &cpu_set);
+   sched_setaffinity(0, sizeof(cpu_set), &cpu_set);
+   sched_getaffinity(0, sizeof(cpu_set), &cpu_set);
+   D("new cpu_set[0]=0x%08lx\n", cpu_set.__bits[0]);
+}
+#endif
+
 int launch_server(int server_port)
 {
 #ifdef HAVE_WIN32_PROC
@@ -1158,6 +1188,32 @@ void build_local_name(char* target_str, size_t target_size, int server_port)
 }
 
 #if !ADB_HOST
+
+static void drop_capabilities_bounding_set_if_needed() {
+#ifdef ALLOW_ADBD_ROOT
+    char value[PROPERTY_VALUE_MAX];
+    property_get("ro.debuggable", value, "");
+    if (strcmp(value, "1") == 0) {
+        return;
+    }
+#endif
+    int i;
+    for (i = 0; prctl(PR_CAPBSET_READ, i, 0, 0, 0) >= 0; i++) {
+        if ((i == CAP_SETUID) || (i == CAP_SETGID)) {
+            // CAP_SETUID CAP_SETGID needed by /system/bin/run-as
+            continue;
+        }
+        int err = prctl(PR_CAPBSET_DROP, i, 0, 0, 0);
+
+        // Some kernels don't have file capabilities compiled in, and
+        // prctl(PR_CAPBSET_DROP) returns EINVAL. Don't automatically
+        // die when we see such misconfigured kernels.
+        if ((err < 0) && (errno != EINVAL)) {
+            exit(1);
+        }
+    }
+}
+
 static int should_drop_privileges() {
 #ifndef ALLOW_ADBD_ROOT
     return 1;
@@ -1212,6 +1268,10 @@ int adb_main(int is_daemon, int server_port)
 
 #if ADB_HOST
     HOST = 1;
+
+#ifdef WORKAROUND_BUG6558362
+    if(is_daemon) adb_set_affinity();
+#endif
     usb_vendors_init();
     usb_init();
     local_init(DEFAULT_ADB_LOCAL_TRANSPORT_PORT);
@@ -1247,6 +1307,8 @@ int adb_main(int is_daemon, int server_port)
         if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) != 0) {
             exit(1);
         }
+
+        drop_capabilities_bounding_set_if_needed();
 
         /* add extra groups:
         ** AID_ADB to access the USB driver

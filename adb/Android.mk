@@ -17,6 +17,7 @@ ifeq ($(HOST_OS),linux)
   USB_SRCS := usb_linux.c
   EXTRA_SRCS := get_my_path_linux.c
   LOCAL_LDLIBS += -lrt -ldl -lpthread
+  LOCAL_CFLAGS += -DWORKAROUND_BUG6558362
 endif
 
 ifeq ($(HOST_OS),darwin)
@@ -77,6 +78,7 @@ endif
 LOCAL_CFLAGS += -O2 -g -DADB_HOST=1  -Wall -Wno-unused-parameter
 LOCAL_CFLAGS += -D_XOPEN_SOURCE -D_GNU_SOURCE
 LOCAL_MODULE := adb
+LOCAL_MODULE_TAGS := debug
 
 LOCAL_STATIC_LIBRARIES := libzipfile libunz libcrypto_static $(EXTRA_STATIC_LIBS)
 ifeq ($(USE_SYSDEPS_WIN32),)

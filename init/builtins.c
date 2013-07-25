@@ -36,10 +36,8 @@
 #include <sys/system_properties.h>
 #include <fs_mgr.h>
 
-#ifdef HAVE_SELINUX
 #include <selinux/selinux.h>
 #include <selinux/label.h>
-#endif
 
 #include "init.h"
 #include "keywords.h"
@@ -548,6 +546,7 @@ int do_mount_all(int nargs, char **args)
     int child_ret = -1;
     int status;
     const char *prop;
+    struct fstab *fstab;
 
     if (nargs != 2) {
         return -1;
@@ -571,7 +570,9 @@ int do_mount_all(int nargs, char **args)
     } else if (pid == 0) {
         /* child, call fs_mgr_mount_all() */
         klog_set_level(6);  /* So we can see what fs_mgr_mount_all() does */
-        child_ret = fs_mgr_mount_all(args[1]);
+        fstab = fs_mgr_read_fstab(args[1]);
+        child_ret = fs_mgr_mount_all(fstab);
+        fs_mgr_free_fstab(fstab);
         if (child_ret == -1) {
             ERROR("fs_mgr_mount_all returned an error\n");
         }
@@ -597,24 +598,20 @@ int do_mount_all(int nargs, char **args)
 }
 
 int do_setcon(int nargs, char **args) {
-#ifdef HAVE_SELINUX
     if (is_selinux_enabled() <= 0)
         return 0;
     if (setcon(args[1]) < 0) {
         return -errno;
     }
-#endif
     return 0;
 }
 
 int do_setenforce(int nargs, char **args) {
-#ifdef HAVE_SELINUX
     if (is_selinux_enabled() <= 0)
         return 0;
     if (security_setenforce(atoi(args[1])) < 0) {
         return -errno;
     }
-#endif
     return 0;
 }
 
@@ -842,36 +839,30 @@ int do_restorecon(int nargs, char **args) {
 }
 
 int do_setsebool(int nargs, char **args) {
-#ifdef HAVE_SELINUX
-    SELboolean *b = alloca(nargs * sizeof(SELboolean));
-    char *v;
-    int i;
+    const char *name = args[1];
+    const char *value = args[2];
+    SELboolean b;
+    int ret;
 
     if (is_selinux_enabled() <= 0)
         return 0;
 
-    for (i = 1; i < nargs; i++) {
-        char *name = args[i];
-        v = strchr(name, '=');
-        if (!v) {
-            ERROR("setsebool: argument %s had no =\n", name);
-            return -EINVAL;
-        }
-        *v++ = 0;
-        b[i-1].name = name;
-        if (!strcmp(v, "1") || !strcasecmp(v, "true") || !strcasecmp(v, "on"))
-            b[i-1].value = 1;
-        else if (!strcmp(v, "0") || !strcasecmp(v, "false") || !strcasecmp(v, "off"))
-            b[i-1].value = 0;
-        else {
-            ERROR("setsebool: invalid value %s\n", v);
-            return -EINVAL;
-        }
+    b.name = name;
+    if (!strcmp(value, "1") || !strcasecmp(value, "true") || !strcasecmp(value, "on"))
+        b.value = 1;
+    else if (!strcmp(value, "0") || !strcasecmp(value, "false") || !strcasecmp(value, "off"))
+        b.value = 0;
+    else {
+        ERROR("setsebool: invalid value %s\n", value);
+        return -EINVAL;
     }
 
-    if (security_set_boolean_list(nargs - 1, b, 0) < 0)
-        return -errno;
-#endif
+    if (security_set_boolean_list(1, &b, 0) < 0) {
+        ret = -errno;
+        ERROR("setsebool: could not set %s to %s\n", name, value);
+        return ret;
+    }
+
     return 0;
 }
 

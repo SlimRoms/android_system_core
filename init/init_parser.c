@@ -632,6 +632,7 @@ void queue_builtin_action(int (*func)(int nargs, char **args), char *name)
     act = calloc(1, sizeof(*act));
     act->name = name;
     list_init(&act->commands);
+    list_init(&act->qlist);
 
     cmd = calloc(1, sizeof(*cmd));
     cmd->func = func;
@@ -644,7 +645,9 @@ void queue_builtin_action(int (*func)(int nargs, char **args), char *name)
 
 void action_add_queue_tail(struct action *act)
 {
-    list_add_tail(&action_queue, &act->qlist);
+    if (list_empty(&act->qlist)) {
+        list_add_tail(&action_queue, &act->qlist);
+    }
 }
 
 struct action *action_remove_queue_head(void)
@@ -655,6 +658,7 @@ struct action *action_remove_queue_head(void)
         struct listnode *node = list_head(&action_queue);
         struct action *act = node_to_item(node, struct action, qlist);
         list_remove(node);
+        list_init(node);
         return act;
     }
 }
@@ -860,13 +864,11 @@ static void parse_line_service(struct parse_state *state, int nargs, char **args
         }
         break;
     case K_seclabel:
-#ifdef HAVE_SELINUX
         if (nargs != 2) {
             parse_error(state, "seclabel option requires a label string\n");
         } else {
             svc->seclabel = args[1];
         }
-#endif
         break;
 
     default:
@@ -888,6 +890,7 @@ static void *parse_action(struct parse_state *state, int nargs, char **args)
     act = calloc(1, sizeof(*act));
     act->name = args[1];
     list_init(&act->commands);
+    list_init(&act->qlist);
     list_add_tail(&action_list, &act->alist);
         /* XXX add to hash */
     return act;
