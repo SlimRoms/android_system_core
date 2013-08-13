@@ -223,7 +223,6 @@ int usb_host_read_event(struct usb_host_context *context)
     char event_buf[512];
     char path[100];
     int i, ret, done = 0;
-    int j, event_size;
     int offset = 0;
     int wd;
 

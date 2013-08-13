@@ -148,6 +148,7 @@ void fixup_sys_perms(const char *upath)
         INFO("fixup %s %d %d 0%o\n", buf, dp->uid, dp->gid, dp->perm);
         chown(buf, dp->uid, dp->gid);
         chmod(buf, dp->perm);
+        restorecon(buf);
     }
 }
 
@@ -776,7 +777,6 @@ loading_close_out:
 file_free_out:
     free(file1);
     free(file2);
-    free(file3);
 data_free_out:
     free(data);
 loading_free_out:
@@ -886,6 +886,7 @@ void device_init(void)
     if (is_selinux_enabled() > 0) {
         sehandle = selinux_android_file_context_handle();
     }
+
     /* is 256K enough? udev uses 16MB! */
     device_fd = uevent_open_socket(256*1024, true);
     if(device_fd < 0)

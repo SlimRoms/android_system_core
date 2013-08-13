@@ -57,10 +57,8 @@ TOOLS := \
 	lsof \
 	du \
 	md5 \
-	restart
-
-TOOLS += \
 	clear \
+	restart \
 	getenforce \
 	setenforce \
 	chcon \
@@ -93,8 +91,6 @@ ifeq ($(BOARD_USES_BOOTMENU),true)
 else
 	LOCAL_SRC_FILES += reboot.c
 endif
-
-LOCAL_SHARED_LIBRARIES := libcutils libc libusbhost
 
 LOCAL_C_INCLUDES := bionic/libc/bionic
 

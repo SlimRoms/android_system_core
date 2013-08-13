@@ -96,7 +96,7 @@ void notify_service_state(const char *name, const char *state)
 }
 
 static int have_console;
-static char console_name[PROP_VALUE_MAX] = "/dev/console";
+static char *console_name = "/dev/console";
 static time_t process_needs_restart;
 
 static const char *ENV[32];
@@ -344,14 +344,12 @@ void service_start(struct service *svc, const char *dynamic_args)
         for (ei = svc->envvars; ei; ei = ei->next)
             add_environment(ei->name, ei->value);
 
-        setsockcreatecon(scon);
-
         for (si = svc->sockets; si; si = si->next) {
             int socket_type = (
                     !strcmp(si->type, "stream") ? SOCK_STREAM :
                         (!strcmp(si->type, "dgram") ? SOCK_DGRAM : SOCK_SEQPACKET));
             int s = create_socket(si->name, socket_type,
-                                  si->perm, si->uid, si->gid);
+                                  si->perm, si->uid, si->gid, si->socketcon ?: scon);
             if (s >= 0) {
                 publish_socket(si->name, s);
             }
@@ -359,7 +357,6 @@ void service_start(struct service *svc, const char *dynamic_args)
 
         freecon(scon);
         scon = NULL;
-        setsockcreatecon(NULL);
 
         if (svc->ioprio_class != IoSchedClass_NONE) {
             if (android_set_ioprio(getpid(), svc->ioprio_class, svc->ioprio_pri)) {
@@ -524,7 +521,7 @@ static void restart_processes()
 
 static void msg_start(const char *name)
 {
-    struct service *svc = NULL;
+    struct service *svc;
     char *tmp = NULL;
     char *args = NULL;
 
@@ -532,13 +529,11 @@ static void msg_start(const char *name)
         svc = service_find_by_name(name);
     else {
         tmp = strdup(name);
-        if (tmp) {
-            args = strchr(tmp, ':');
-            *args = '\0';
-            args++;
+        args = strchr(tmp, ':');
+        *args = '\0';
+        args++;
 
-            svc = service_find_by_name(tmp);
-        }
+        svc = service_find_by_name(tmp);
     }
 
     if (svc) {
@@ -643,9 +638,11 @@ static int keychord_init_action(int nargs, char **args)
 static int console_init_action(int nargs, char **args)
 {
     int fd;
+    char tmp[PROP_VALUE_MAX];
 
     if (console[0]) {
-        snprintf(console_name, sizeof(console_name), "/dev/%s", console);
+        snprintf(tmp, sizeof(tmp), "/dev/%s", console);
+        console_name = strdup(tmp);
     }
 
     fd = open(console_name, O_RDWR);
@@ -721,12 +718,6 @@ static void import_kernel_nv(char *name, int for_emulator)
         cnt = snprintf(prop, sizeof(prop), "ro.boot.%s", boot_prop_name);
         if (cnt < PROP_NAME_MAX)
             property_set(prop, value);
-#ifdef USE_SEC_LPM_RESET_REASON
-    } else if (!strncmp(name, "sec_debug.reset_reason", 22)) {
-        if (!strcmp(value, "0x1a2b3c10")) {
-            property_set("ro.boot.mode", "charger");
-        }
-#endif
     }
 }
 
@@ -915,19 +906,19 @@ int audit_callback(void *data, security_class_t cls, char *buf, size_t len)
 static int charging_mode_booting(void)
 {
 #ifndef BOARD_CHARGING_MODE_BOOTING_LPM
-	return 0;
+    return 0;
 #else
-	int f;
-	char cmb;
-	f = open(BOARD_CHARGING_MODE_BOOTING_LPM, O_RDONLY);
-	if (f < 0)
-		return 0;
+    int f;
+    char cmb;
+    f = open(BOARD_CHARGING_MODE_BOOTING_LPM, O_RDONLY);
+    if (f < 0)
+        return 0;
 
-	if (1 != read(f, (void *)&cmb,1))
-		return 0;
+    if (1 != read(f, (void *)&cmb,1))
+        return 0;
 
-	close(f);
-	return ('1' == cmb);
+    close(f);
+    return ('1' == cmb);
 #endif
 }
 
@@ -1053,11 +1044,11 @@ int main(int argc, char **argv)
     /* skip mounting filesystems in charger mode */
     if (!is_charger) {
         action_for_each_trigger("early-fs", action_add_queue_tail);
-    if(emmc_boot) {
-        action_for_each_trigger("emmc-fs", action_add_queue_tail);
-    } else {
-        action_for_each_trigger("fs", action_add_queue_tail);
-    }
+        if(emmc_boot) {
+            action_for_each_trigger("emmc-fs", action_add_queue_tail);
+        } else {
+            action_for_each_trigger("fs", action_add_queue_tail);
+        }
         action_for_each_trigger("post-fs", action_add_queue_tail);
         action_for_each_trigger("post-fs-data", action_add_queue_tail);
     }

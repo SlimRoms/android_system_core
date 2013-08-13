@@ -82,7 +82,6 @@ struct {
     { "hw.",              AID_SYSTEM,   0 },
     { "sys.",             AID_SYSTEM,   0 },
     { "service.",         AID_SYSTEM,   0 },
-    { "service.",         AID_RADIO,    0 },
     { "wlan.",            AID_SYSTEM,   0 },
     { "bluetooth.",       AID_BLUETOOTH,   0 },
     { "dhcp.",            AID_SYSTEM,   0 },
@@ -92,6 +91,7 @@ struct {
     { "log.",             AID_SHELL,    0 },
     { "service.adb.root", AID_SHELL,    0 },
     { "service.adb.tcp.port", AID_SHELL,    0 },
+    { "persist.mmac.", AID_SYSTEM, 0 },
     { "persist.sys.",     AID_SYSTEM,   0 },
     { "persist.service.", AID_SYSTEM,   0 },
     { "persist.service.", AID_RADIO,    0 },
@@ -576,18 +576,6 @@ static void load_persistent_properties()
                 continue;
             }
 
-            // File must not be accessible to others, be owned by root/root, and
-            // not be a hard link to any other file.
-            if (((sb.st_mode & (S_IRWXG | S_IRWXO)) != 0)
-                    || (sb.st_uid != 0)
-                    || (sb.st_gid != 0)
-                    || (sb.st_nlink != 1)) {
-                ERROR("skipping insecure property file %s (uid=%lu gid=%lu nlink=%d mode=%o)\n",
-                      entry->d_name, sb.st_uid, sb.st_gid, sb.st_nlink, sb.st_mode);
-                close(fd);
-                continue;
-            }
-
             length = read(fd, value, sizeof(value) - 1);
             if (length >= 0) {
                 value[length] = 0;
@@ -653,7 +641,7 @@ void start_property_service(void)
     /* Read persistent properties after all default values have been loaded. */
     load_persistent_properties();
 
-    fd = create_socket(PROP_SERVICE_NAME, SOCK_STREAM, 0666, 0, 0);
+    fd = create_socket(PROP_SERVICE_NAME, SOCK_STREAM, 0666, 0, 0, NULL);
     if(fd < 0) return;
     fcntl(fd, F_SETFD, FD_CLOEXEC);
     fcntl(fd, F_SETFL, O_NONBLOCK);

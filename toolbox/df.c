@@ -24,12 +24,7 @@ static void printsize(long long n)
     }
 
     t = (n + 512) / 1024;
-    if (t%10 != 0) {
     printf("%4lld.%1lld%c", t/10, t%10, unit);
-    }
-    else {
-    printf("%4lld.%1lld%c", t/10, t%10, unit);
-    }
 }
 
 static void df(char *s, int always) {
