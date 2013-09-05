@@ -61,6 +61,8 @@ LOCAL_STATIC_LIBRARIES := \
 	libselinux \
 	libmincrypt \
 	libext4_utils_static \
+	libsparse_static \
+	libz \
 	libext2_blkid \
 	libext2_uuid
 
