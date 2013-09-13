@@ -10,7 +10,6 @@ LOCAL_SRC_FILES:= \
 	property_service.c \
 	util.c \
 	parser.c \
-	logo.c \
 	keychords.c \
 	signal_handler.c \
 	init_parser.c \
@@ -31,8 +30,9 @@ ifeq ($(BOARD_WANTS_EMMC_BOOT),true)
 LOCAL_CFLAGS += -DWANTS_EMMC_BOOT
 endif
 
-ifeq ($(TARGET_NO_INITLOGO),true)
-LOCAL_CFLAGS += -DNO_INITLOGO
+ifneq ($(TARGET_NO_INITLOGO),true)
+LOCAL_SRC_FILES += logo.c
+LOCAL_CFLAGS    += -DINITLOGO
 endif
 
 ifneq ($(TARGET_NR_SVC_SUPP_GIDS),)
