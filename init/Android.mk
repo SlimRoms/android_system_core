@@ -113,6 +113,11 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_SANITIZE := signed-integer-overflow
 # First stage init is weird: it may start without stdout/stderr, and no /proc.
 LOCAL_NOSANITIZE := hwaddress
+
+ifneq ($(strip $(TARGET_INIT_VENDOR_LIB)),)
+LOCAL_WHOLE_STATIC_LIBRARIES += $(TARGET_INIT_VENDOR_LIB)
+endif
+
 include $(BUILD_EXECUTABLE)
 endif
 

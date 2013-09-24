@@ -136,6 +136,7 @@ cc_library_static {
         "ueventd.cpp",
         "ueventd_parser.cpp",
         "util.cpp",
+        "vendor_init.cpp",
     ],
     whole_static_libs: ["libcap", "com.android.sysprop.apex"],
     header_libs: ["bootimg_headers"],
