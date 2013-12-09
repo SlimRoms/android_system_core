@@ -1057,6 +1057,25 @@ int audit_callback(void *data, security_class_t cls, char *buf, size_t len)
     return 0;
 }
 
+static int charging_mode_booting(void)
+{
+#ifndef BOARD_CHARGING_MODE_BOOTING_LPM
+    return 0;
+#else
+    int f;
+    char cmb;
+    f = open(BOARD_CHARGING_MODE_BOOTING_LPM, O_RDONLY);
+    if (f < 0)
+        return 0;
+
+    if (1 != read(f, (void *)&cmb,1))
+        return 0;
+
+    close(f);
+    return ('1' == cmb);
+#endif
+}
+
 static void selinux_initialize(void)
 {
     if (selinux_is_disabled()) {
@@ -1074,25 +1093,6 @@ static void selinux_initialize(void)
     bool is_enforcing = selinux_is_enforcing();
     INFO("SELinux: security_setenforce(%d)\n", is_enforcing);
     security_setenforce(is_enforcing);
-}
-
-static int charging_mode_booting(void)
-{
-#ifndef BOARD_CHARGING_MODE_BOOTING_LPM
-	return 0;
-#else
-	int f;
-	char cmb;
-	f = open(BOARD_CHARGING_MODE_BOOTING_LPM, O_RDONLY);
-	if (f < 0)
-		return 0;
-
-	if (1 != read(f, (void *)&cmb,1))
-		return 0;
-
-	close(f);
-	return ('1' == cmb);
-#endif
 }
 
 int main(int argc, char **argv)
@@ -1203,11 +1203,11 @@ int main(int argc, char **argv)
     /* skip mounting filesystems in charger mode */
     if (!is_charger) {
         action_for_each_trigger("early-fs", action_add_queue_tail);
-    if(emmc_boot) {
-        action_for_each_trigger("emmc-fs", action_add_queue_tail);
-    } else {
-        action_for_each_trigger("fs", action_add_queue_tail);
-    }
+        if(emmc_boot) {
+            action_for_each_trigger("emmc-fs", action_add_queue_tail);
+        } else {
+            action_for_each_trigger("fs", action_add_queue_tail);
+        }
         action_for_each_trigger("post-fs", action_add_queue_tail);
         action_for_each_trigger("post-fs-data", action_add_queue_tail);
     }
