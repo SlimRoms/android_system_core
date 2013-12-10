@@ -92,6 +92,7 @@ struct {
     { "log.",             AID_SHELL,    0 },
     { "service.adb.root", AID_SHELL,    0 },
     { "service.adb.tcp.port", AID_SHELL,    0 },
+    { "persist.mmac.", AID_SYSTEM, 0 },
     { "persist.sys.",     AID_SYSTEM,   0 },
     { "persist.service.", AID_SYSTEM,   0 },
     { "persist.service.", AID_RADIO,    0 },
@@ -99,6 +100,7 @@ struct {
     { "persist.service.bdroid.", AID_BLUETOOTH,   0 },
     { "selinux."         , AID_SYSTEM,   0 },
     { "net.pdp",          AID_RADIO,    AID_RADIO },
+    { "service.bootanim.exit", AID_GRAPHICS, 0 },
 #ifdef PROPERTY_PERMS_APPEND
 PROPERTY_PERMS_APPEND
 #endif
@@ -604,7 +606,7 @@ void start_property_service(void)
     /* Read persistent properties after all default values have been loaded. */
     load_persistent_properties();
 
-    fd = create_socket(PROP_SERVICE_NAME, SOCK_STREAM, 0666, 0, 0);
+    fd = create_socket(PROP_SERVICE_NAME, SOCK_STREAM, 0666, 0, 0, NULL);
     if(fd < 0) return;
     fcntl(fd, F_SETFD, FD_CLOEXEC);
     fcntl(fd, F_SETFL, O_NONBLOCK);
