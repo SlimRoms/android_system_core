@@ -268,7 +268,7 @@ on post-fs-data
     #setprop vold.post_fs_data_done 1
 
 # Include extra init file
-    import /init.slim.rc
+    import /init.ose.rc
 
 on boot
 # basic network init
