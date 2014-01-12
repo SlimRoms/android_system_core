@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <batteryservice/BatteryService.h>
-#include <cutils/klog.h>
+#include <cutils/log.h>
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
@@ -63,7 +63,7 @@ int BatteryMonitor::getBatteryStatus(const char* status) {
 
     ret = mapSysfsString(status, batteryStatusMap);
     if (ret < 0) {
-        KLOG_WARNING(LOG_TAG, "Unknown battery status '%s'\n", status);
+        ALOGW("Unknown battery status '%s'", status);
         ret = BATTERY_STATUS_UNKNOWN;
     }
 
@@ -85,7 +85,7 @@ int BatteryMonitor::getBatteryHealth(const char* status) {
 
     ret = mapSysfsString(status, batteryHealthMap);
     if (ret < 0) {
-        KLOG_WARNING(LOG_TAG, "Unknown battery health '%s'\n", status);
+        ALOGW("Unknown battery health '%s'", status);
         ret = BATTERY_HEALTH_UNKNOWN;
     }
 
@@ -99,7 +99,7 @@ int BatteryMonitor::readFromFile(const String8& path, char* buf, size_t size) {
         return -1;
     int fd = open(path.string(), O_RDONLY, 0);
     if (fd == -1) {
-        KLOG_ERROR(LOG_TAG, "Could not open '%s'\n", path.string());
+        ALOGE("Could not open '%s'", path.string());
         return -1;
     }
 
@@ -233,7 +233,7 @@ bool BatteryMonitor::update(void) {
                     props.chargerWirelessOnline = true;
                     break;
                 default:
-                    KLOG_WARNING(LOG_TAG, "%s: Unknown power supply type\n",
+                    ALOGW("%s: Unknown power supply type",
                                  mChargerNames[i].string());
                 }
             }
@@ -259,7 +259,7 @@ bool BatteryMonitor::update(void) {
             strlcat(dmesgline, b, sizeof(dmesgline));
         }
 
-        KLOG_INFO(LOG_TAG, "%s chg=%s%s%s\n", dmesgline,
+        ALOGI("%s chg=%s%s%s", dmesgline,
                   props.chargerAcOnline ? "a" : "",
                   props.chargerUsbOnline ? "u" : "",
                   props.chargerWirelessOnline ? "w" : "");
@@ -278,7 +278,7 @@ void BatteryMonitor::init(struct healthd_config *hc, bool nosvcmgr) {
     mHealthdConfig = hc;
     DIR* dir = opendir(POWER_SUPPLY_SYSFS_PATH);
     if (dir == NULL) {
-        KLOG_ERROR(LOG_TAG, "Could not open %s\n", POWER_SUPPLY_SYSFS_PATH);
+        ALOGE("Could not open %s", POWER_SUPPLY_SYSFS_PATH);
     } else {
         struct dirent* entry;
 
@@ -399,21 +399,21 @@ void BatteryMonitor::init(struct healthd_config *hc, bool nosvcmgr) {
     }
 
     if (!mChargerNames.size())
-        KLOG_ERROR(LOG_TAG, "No charger supplies found\n");
+        ALOGE("No charger supplies found");
     if (mHealthdConfig->batteryStatusPath.isEmpty())
-        KLOG_WARNING(LOG_TAG, "BatteryStatusPath not found\n");
+        ALOGW("BatteryStatusPath not found");
     if (mHealthdConfig->batteryHealthPath.isEmpty())
-        KLOG_WARNING(LOG_TAG, "BatteryHealthPath not found\n");
+        ALOGW("BatteryHealthPath not found");
     if (mHealthdConfig->batteryPresentPath.isEmpty())
-        KLOG_WARNING(LOG_TAG, "BatteryPresentPath not found\n");
+        ALOGW("BatteryPresentPath not found");
     if (mHealthdConfig->batteryCapacityPath.isEmpty())
-        KLOG_WARNING(LOG_TAG, "BatteryCapacityPath not found\n");
+        ALOGW("BatteryCapacityPath not found");
     if (mHealthdConfig->batteryVoltagePath.isEmpty())
-        KLOG_WARNING(LOG_TAG, "BatteryVoltagePath not found\n");
+        ALOGW("BatteryVoltagePath not found");
     if (mHealthdConfig->batteryTemperaturePath.isEmpty())
-        KLOG_WARNING(LOG_TAG, "BatteryTemperaturePath not found\n");
+        ALOGW("BatteryTemperaturePath not found");
     if (mHealthdConfig->batteryTechnologyPath.isEmpty())
-        KLOG_WARNING(LOG_TAG, "BatteryTechnologyPath not found\n");
+        ALOGW("BatteryTechnologyPath not found");
 
     if (nosvcmgr == false) {
             mBatteryPropertiesRegistrar = new BatteryPropertiesRegistrar(this);
