@@ -62,9 +62,11 @@
 
 #define BATTERY_UNKNOWN_TIME    (2 * MSEC_PER_SEC)
 #define POWER_ON_KEY_TIME       (2 * MSEC_PER_SEC)
-#define UNPLUGGED_SHUTDOWN_TIME (10 * MSEC_PER_SEC)
+#define UNPLUGGED_SHUTDOWN_TIME (2 * MSEC_PER_SEC)
 
 #define BATTERY_FULL_THRESH     95
+
+#define BACKLIGHT_TOGGLE_PATH "/sys/class/leds/lcd-backlight/brightness"
 
 #define LAST_KMSG_PATH          "/proc/last_kmsg"
 #define LAST_KMSG_MAX_SZ        (32 * 1024)
@@ -171,7 +173,6 @@ static struct frame batt_anim_frames[] = {
         .name = "charger/battery_4",
         .disp_time = 750,
         .min_capacity = 80,
-        .level_only = true,
     },
     {
         .name = "charger/battery_5",
@@ -192,6 +193,37 @@ static struct charger charger_state = {
 
 static int char_width;
 static int char_height;
+
+/*On certain targets the FBIOBLANK ioctl does not turn off the
+ * backlight. In those cases we need to manually toggle it on/off
+ */
+static int set_backlight(int toggle)
+{
+        int fd;
+        char buffer[10];
+
+        memset(buffer, '\0', sizeof(buffer));
+        fd = open(BACKLIGHT_TOGGLE_PATH, O_RDWR);
+        if (fd < 0) {
+                LOGE("Could not open backlight node : %s", strerror(errno));
+                goto cleanup;
+        }
+        if (toggle) {
+                LOGI("Enabling backlight");
+                snprintf(buffer, sizeof(int), "%d\n", 100);
+        } else {
+                LOGI("Disabling backlight");
+                snprintf(buffer, sizeof(int), "%d\n", 0);
+        }
+        if (write(fd, buffer,strlen(buffer)) < 0) {
+                LOGE("Could not write to backlight node : %s", strerror(errno));
+                goto cleanup;
+        }
+cleanup:
+        if (fd >= 0)
+                close(fd);
+        return 0;
+}
 
 /* current time in milliseconds */
 static int64_t curr_time_ms(void)
@@ -658,6 +690,20 @@ static void android_green(void)
     gr_color(0xa4, 0xc6, 0x39, 255);
 }
 
+static void draw_capacity(struct charger *charger)
+{
+    char cap_str[64];
+    int x, y;
+    int str_len_px;
+
+    snprintf(cap_str, sizeof(cap_str), "%d%%", charger->batt_anim->capacity);
+    str_len_px = gr_measure(cap_str);
+    x = (gr_fb_width() - str_len_px) / 2;
+    y = (gr_fb_height() + char_height) / 2;
+    android_green();
+    gr_text(x, y, cap_str, 0);
+}
+
 /* returns the last y-offset of where the surface ends */
 static int draw_surface_centered(struct charger *charger, gr_surface surface)
 {
@@ -710,14 +756,18 @@ static void redraw_screen(struct charger *charger)
     /* try to display *something* */
     if (batt_anim->capacity < 0 || batt_anim->num_frames == 0)
         draw_unknown(charger);
-    else
+    else {
         draw_battery(charger);
+        draw_capacity(charger);
+    }
     gr_flip();
 }
 
 static void kick_animation(struct animation *anim)
 {
+#ifdef ALLOW_SUSPEND_IN_CHARGER
     write_file(SYS_POWER_STATE, "on", strlen("on"));
+#endif
     anim->run = true;
 }
 
@@ -742,7 +792,12 @@ static void update_screen_state(struct charger *charger, int64_t now)
         reset_animation(batt_anim);
         charger->next_screen_transition = -1;
         gr_fb_blank(true);
+        set_backlight(false);
+
+#ifdef ALLOW_SUSPEND_IN_CHARGER
         write_file(SYS_POWER_STATE, "mem", strlen("mem"));
+#endif
+
         LOGV("[%lld] animation done\n", now);
         if (charger->num_supplies_online > 0)
             request_suspend(true);
@@ -776,8 +831,10 @@ static void update_screen_state(struct charger *charger, int64_t now)
     }
 
     /* unblank the screen  on first cycle */
-    if (batt_anim->cur_cycle == 0)
+    if (batt_anim->cur_cycle == 0) {
         gr_fb_blank(false);
+        set_backlight(true);
+    }
 
     /* draw the new frame (@ cur_frame) */
     redraw_screen(charger);
@@ -868,6 +925,7 @@ static void set_next_key_check(struct charger *charger,
 
 static void process_key(struct charger *charger, int code, int64_t now)
 {
+    struct animation *batt_anim = charger->batt_anim;
     struct key_state *key = &charger->keys[code];
     int64_t next_key_check;
 
@@ -886,9 +944,23 @@ static void process_key(struct charger *charger, int code, int64_t now)
         } else {
             /* if the power key got released, force screen state cycle */
             if (key->pending) {
-                request_suspend(false);
-                kick_animation(charger->batt_anim);
+                if (!batt_anim->run) {
+                    request_suspend(false);
+                    kick_animation(charger->batt_anim);
+                } else {
+                    reset_animation(batt_anim);
+                    charger->next_screen_transition = -1;
+                    gr_fb_blank(true);
+                    set_backlight(false);
+                    if (charger->num_supplies_online > 0)
+                        request_suspend(true);
+                }
             }
+        }
+    } else {
+        if (key->pending) {
+            request_suspend(false);
+            kick_animation(charger->batt_anim);
         }
     }
 
@@ -898,6 +970,8 @@ static void process_key(struct charger *charger, int code, int64_t now)
 static void handle_input_state(struct charger *charger, int64_t now)
 {
     process_key(charger, KEY_POWER, now);
+    process_key(charger, KEY_HOME, now);
+    process_key(charger, KEY_HOMEPAGE, now);
 
     if (charger->next_key_check != -1 && now > charger->next_key_check)
         charger->next_key_check = -1;
@@ -1041,6 +1115,7 @@ int main(int argc, char **argv)
 
 #ifndef CHARGER_DISABLE_INIT_BLANK
     gr_fb_blank(true);
+    set_backlight(false);
 #endif
 
     charger->next_screen_transition = now - 1;
