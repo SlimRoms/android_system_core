@@ -498,50 +498,31 @@ int make_dir(const char *path, mode_t mode)
     return rc;
 }
 
-static int restorecon_sb(const char *pathname, const struct stat *sb)
-{
-    char *secontext = NULL;
-    char *oldsecontext = NULL;
-    int i;
-
-    if (selabel_lookup(sehandle, &secontext, pathname, sb->st_mode) < 0)
-        return -errno;
-
-    if (lgetfilecon(pathname, &oldsecontext) < 0) {
-        freecon(secontext);
-        return -errno;
-    }
-
-    if (strcmp(oldsecontext, secontext) != 0) {
-        if (lsetfilecon(pathname, secontext) < 0) {
-            freecon(oldsecontext);
-            freecon(secontext);
-            return -errno;
-        }
-    }
-    freecon(oldsecontext);
-    freecon(secontext);
-    return 0;
-}
-
 int restorecon(const char *pathname)
 {
+    char *secontext = NULL;
     struct stat sb;
+    int i;
 
     if (is_selinux_enabled() <= 0 || !sehandle)
         return 0;
 
     if (lstat(pathname, &sb) < 0)
         return -errno;
-
-    return restorecon_sb(pathname, &sb);
+    if (selabel_lookup(sehandle, &secontext, pathname, sb.st_mode) < 0)
+        return -errno;
+    if (lsetfilecon(pathname, secontext) < 0) {
+        freecon(secontext);
+        return -errno;
+    }
+    freecon(secontext);
+    return 0;
 }
 
 static int nftw_restorecon(const char* filename, const struct stat* statptr,
-    int fileflags __attribute__((unused)),
-    struct FTW* pftw __attribute__((unused)))
+    int fileflags, struct FTW* pftw)
 {
-    restorecon_sb(filename, statptr);
+    restorecon(filename);
     return 0;
 }
 
@@ -549,9 +530,5 @@ int restorecon_recursive(const char* pathname)
 {
     int fd_limit = 20;
     int flags = FTW_DEPTH | FTW_MOUNT | FTW_PHYS;
-
-    if (is_selinux_enabled() <= 0 || !sehandle)
-        return 0;
-
     return nftw(pathname, nftw_restorecon, fd_limit, flags);
 }
