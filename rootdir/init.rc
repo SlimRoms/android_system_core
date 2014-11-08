@@ -10,6 +10,9 @@ import /init.${ro.hardware}.rc
 import /init.usb.configfs.rc
 import /init.${ro.zygote}.rc
 import /init.trace.rc
+# Include SLIM's extra init file
+import /init.slim.rc
+
 
 on early-init
     # Set init and its forked children's oom_adj.
