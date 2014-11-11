@@ -203,7 +203,7 @@ static const struct android_id_info android_ids[] = {
     { "mot_caif",  AID_MOT_CAIF, },
     { "mot_dlna",  AID_MOT_DLNA, },
 #endif
-    { "sensors",       AID_SENSORS, },
+
     { "misc",          AID_MISC, },
     { "nobody",        AID_NOBODY, },
     { "audit",      AID_AUDIT, },
