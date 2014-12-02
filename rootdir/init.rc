@@ -9,6 +9,8 @@ import /init.usb.rc
 import /init.${ro.hardware}.rc
 import /init.${ro.zygote}.rc
 import /init.trace.rc
+# Include SLIM's extra init file
+import /init.slim.rc
 
 on early-init
     # Set init and its forked children's oom_adj.
@@ -329,9 +331,6 @@ on post-fs-data
     # Set indication (checked by vold) that we have finished this action
     #setprop vold.post_fs_data_done 1
 
-# Include extra init file
-    import /init.slim.rc
-
 on boot
     # basic network init
     ifup lo
@@ -583,7 +582,7 @@ service drm /system/bin/drmserver
 service media /system/bin/mediaserver
     class main
     user media
-    group audio camera inet net_bt net_bt_admin net_bw_acct drmrpc qcom_diag mediadrm
+    group audio camera inet net_bt net_bt_admin net_bw_acct drmrpc mediadrm qcom_diag
     ioprio rt 4
 
 # One shot invocation to deal with encrypted volume.
