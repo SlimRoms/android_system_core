@@ -67,6 +67,8 @@ LOCAL_STATIC_LIBRARIES := \
     liblog \
     libcrypto_utils \
     libcrypto \
+    libext2_blkid \
+    libext2_uuid \
     libc++_static \
     libdl \
     libsparse \

@@ -55,6 +55,7 @@
 #include <linux/magic.h>
 #include <log/log_properties.h>
 #include <logwrap/logwrap.h>
+#include <blkid/blkid.h>
 
 #include "fs_mgr.h"
 #include "fs_mgr_avb.h"
@@ -417,6 +418,8 @@ static void tune_encrypt(const char* blk_device, const struct fstab_rec* rec,
 //
 static int prepare_fs_for_mount(const char* blk_device, const struct fstab_rec* rec) {
     int fs_stat = 0;
+    int cmp_len;
+    char *detected_fs_type;
 
     if (is_extfs(rec->fs_type)) {
         struct ext4_super_block sb;
@@ -439,7 +442,15 @@ static int prepare_fs_for_mount(const char* blk_device, const struct fstab_rec* 
 
     if ((rec->fs_mgr_flags & MF_CHECK) ||
         (fs_stat & (FS_STAT_UNCLEAN_SHUTDOWN | FS_STAT_QUOTA_ENABLED))) {
-        check_fs(blk_device, rec->fs_type, rec->mount_point, &fs_stat);
+        /* Skip file system check unless we are sure we are the right type */
+        detected_fs_type = blkid_get_tag_value(NULL, "TYPE", blk_device);
+        if (detected_fs_type) {
+            cmp_len = (!strncmp(detected_fs_type, "ext", 3) &&
+                    strlen(detected_fs_type) == 4) ? 3 : strlen(detected_fs_type);
+            if (!strncmp(rec->fs_type, detected_fs_type, cmp_len)) {
+                check_fs(blk_device, rec->fs_type, rec->mount_point, &fs_stat);
+            }
+        }
     }
 
     if (is_extfs(rec->fs_type) && (rec->fs_mgr_flags & (MF_RESERVEDSIZE | MF_FILEENCRYPTION))) {
@@ -564,6 +575,8 @@ static int mount_with_alternatives(struct fstab *fstab, int start_idx, int *end_
     int i;
     int mount_errno = 0;
     int mounted = 0;
+    int cmp_len;
+    char *detected_fs_type;
 
     if (!end_idx || !attempted_idx || start_idx >= fstab->num_entries) {
       errno = EINVAL;
@@ -623,8 +636,16 @@ static int mount_with_alternatives(struct fstab *fstab, int start_idx, int *end_
                         mount_errno = errno;
                     }
                     // retry after fsck
-                    check_fs(fstab->recs[i].blk_device, fstab->recs[i].fs_type,
-                             fstab->recs[i].mount_point, &fs_stat);
+                    /* Skip file system check unless we are sure we are the right type */
+                    detected_fs_type = blkid_get_tag_value(NULL, "TYPE", fstab->recs[i].blk_device);
+                    if (detected_fs_type) {
+                        cmp_len = (!strncmp(detected_fs_type, "ext", 3) &&
+                                strlen(detected_fs_type) == 4) ? 3 : strlen(detected_fs_type);
+                        if (!strncmp(fstab->recs[i].fs_type, detected_fs_type, cmp_len)) {
+                            check_fs(fstab->recs[i].blk_device, fstab->recs[i].fs_type,
+                                     fstab->recs[i].mount_point, &fs_stat);
+                        }
+                    }
                 }
             }
             log_fs_stat(fstab->recs[i].blk_device, fs_stat);
