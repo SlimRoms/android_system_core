@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa3479d7_52a6f4c2",
+        "filename": "fs_mgr/fs_mgr_format.c",
+        "patchSetId": 4
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 1000043
+      },
+      "writtenOn": "2015-05-21T06:27:52Z",
+      "side": 1,
+      "message": "rc \u003d make_ext4fs_internal(fd, NULL, fs_mnt_point, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL);",
+      "range": {
+        "startLine": 55,
+        "startChar": 0,
+        "endLine": 55,
+        "endChar": 84
+      },
+      "revId": "704e811a89b112cc7000e61f72910b47b59a39a6",
+      "serverId": "f8201d64-d729-4630-b91d-5f8be02869f0",
+      "unresolved": false
+    }
+  ]
+}
