@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa3479d7_b26be084",
+        "filename": "init/Android.mk",
+        "patchSetId": 2
+      },
+      "lineNbr": 65,
+      "author": {
+        "id": 1000043
+      },
+      "writtenOn": "2015-05-21T05:25:02Z",
+      "side": 1,
+      "message": "+\tlibext2_uuid_static \\\n+\tliblz4-static \\\n+\tlibsparse_static \\\n+\tlibz",
+      "range": {
+        "startLine": 65,
+        "startChar": 1,
+        "endLine": 65,
+        "endChar": 5
+      },
+      "revId": "93880bfa98abce92dcd887fdf9aa3ad29bb72661",
+      "serverId": "f8201d64-d729-4630-b91d-5f8be02869f0",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa3479d7_9268dc88",
+        "filename": "init/devices.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 644,
+      "author": {
+        "id": 1000043
+      },
+      "writtenOn": "2015-05-21T05:25:02Z",
+      "side": 1,
+      "message": "make_link_init(link_path, \"/dev/block/bootdevice\");",
+      "range": {
+        "startLine": 644,
+        "startChar": 8,
+        "endLine": 644,
+        "endChar": 54
+      },
+      "revId": "93880bfa98abce92dcd887fdf9aa3ad29bb72661",
+      "serverId": "f8201d64-d729-4630-b91d-5f8be02869f0",
+      "unresolved": false
+    }
+  ]
+}
