@@ -200,7 +200,9 @@ enum {
      * IMPLEMENTATION_DEFINED, then HALv3 devices will use gralloc usage flags
      * of SW_READ_OFTEN.
      */
+
 #ifndef CAMERA_VENDOR_L_COMPAT
+
     CAMERA_CMD_SET_VIDEO_FORMAT = 11,
 
     CAMERA_CMD_VENDOR_START = 20,
@@ -220,6 +222,7 @@ enum {
     CAMERA_CMD_METADATA_ON = CAMERA_CMD_VENDOR_START + 6,
     CAMERA_CMD_METADATA_OFF = CAMERA_CMD_VENDOR_START + 7,
     CAMERA_CMD_VENDOR_END = 200,
+
 #else
 
     /**
@@ -235,6 +238,7 @@ enum {
     CAMERA_CMD_METADATA_OFF = 101,
     CAMERA_CMD_SET_VIDEO_FORMAT = 102,
 #endif
+
 };
 
 /** camera fatal errors */
