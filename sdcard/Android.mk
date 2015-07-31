@@ -12,7 +12,7 @@ LOCAL_CFLAGS := -Wall -Wno-unused-parameter -Werror
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_STATIC_LIBRARY)
 
-LOCAL_SHARED_LIBRARIES := libcutils
+LOCAL_SHARED_LIBRARIES := libcutils libpackagelistparser
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := main.c
