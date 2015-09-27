@@ -52,6 +52,7 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_MODULE:= init
 LOCAL_C_INCLUDES += \
+    external/zlib \
     system/extras/ext4_utils \
     system/core/mkbootimg
 
