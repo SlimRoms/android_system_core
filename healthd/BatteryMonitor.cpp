@@ -55,7 +55,12 @@ static int mapSysfsString(const char* str,
 }
 
 int BatteryMonitor::getBatteryStatus(const char* status) {
-    int ret;
+    int ret = HEALTHD_MAP_CONTINUE_SEARCH;
+
+    if (mHealthdConfig->mapBatteryStatusString)
+        ret = mHealthdConfig->mapBatteryStatusString(status);
+
+    if (ret == HEALTHD_MAP_CONTINUE_SEARCH) {
     struct sysfsStringEnumMap batteryStatusMap[] = {
         { "Unknown", BATTERY_STATUS_UNKNOWN },
         { "Charging", BATTERY_STATUS_CHARGING },
@@ -66,10 +71,27 @@ int BatteryMonitor::getBatteryStatus(const char* status) {
     };
 
     ret = mapSysfsString(status, batteryStatusMap);
+    }
+
     if (ret < 0) {
         KLOG_WARNING(LOG_TAG, "Unknown battery status '%s'\n", status);
         ret = BATTERY_STATUS_UNKNOWN;
     }
+
+    return ret;
+}
+
+int BatteryMonitor::getBatteryChargeRate(const char* charge_rate) {
+    int ret = HEALTHD_MAP_CONTINUE_SEARCH;
+
+    if (mHealthdConfig->mapChargeRateString)
+        ret = mHealthdConfig->mapChargeRateString(charge_rate);
+
+    if (ret == HEALTHD_MAP_CONTINUE_SEARCH)
+        ret = BATTERY_CHARGE_RATE_UNKNOWN;
+
+    if (ret < 0)
+        ret = BATTERY_CHARGE_RATE_UNKNOWN;
 
     return ret;
 }
@@ -183,6 +205,7 @@ bool BatteryMonitor::update(void) {
     props.chargerUsbOnline = false;
     props.chargerWirelessOnline = false;
     props.batteryStatus = BATTERY_STATUS_UNKNOWN;
+    props.batteryChargeRate = BATTERY_CHARGE_RATE_UNKNOWN;
     props.batteryHealth = BATTERY_HEALTH_UNKNOWN;
 
     if (!mHealthdConfig->batteryPresentPath.isEmpty())
@@ -202,6 +225,9 @@ bool BatteryMonitor::update(void) {
     const int SIZE = 128;
     char buf[SIZE];
     String8 btech;
+    if (!mHealthdConfig->batteryChargeRatePath.isEmpty())
+        if (readFromFile(mHealthdConfig->batteryChargeRatePath, buf, SIZE) > 0)
+            props.batteryChargeRate = getBatteryChargeRate(buf);
 
     if (readFromFile(mHealthdConfig->batteryStatusPath, buf, SIZE) > 0)
         props.batteryStatus = getBatteryStatus(buf);
