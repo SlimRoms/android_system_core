@@ -759,6 +759,8 @@ static void handle_device_event(struct uevent *uevent)
 
 static int load_firmware(int fw_fd, gzFile gz_fd, int loading_fd, int data_fd)
 {
+    struct stat st;
+    long len_to_copy;
     int ret = 0;
 
     if(fstat(fw_fd, &st) < 0)
