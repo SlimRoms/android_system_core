@@ -66,6 +66,7 @@ static int system_bg_cpuset_fd = -1;
 static int bg_cpuset_fd = -1;
 static int fg_cpuset_fd = -1;
 static int ta_cpuset_fd = -1; // special cpuset for top app
+static int system_bg_schedboost_fd = -1;
 #endif
 
 // File descriptors open to /dev/stune/../tasks, setup by initialize, or -1 on error
@@ -147,9 +148,11 @@ static void __initialize(void) {
         fg_schedboost_fd = open(filename, O_WRONLY | O_CLOEXEC);
         filename = "/dev/stune/background/tasks";
         bg_schedboost_fd = open(filename, O_WRONLY | O_CLOEXEC);
-#endif
+        filename = "/dev/stune/system-background/tasks";
+        system_bg_schedboost_fd = open(filename, O_WRONLY | O_CLOEXEC);
     }
-#endif
+#endif /* USE_SCHEDBOOST */
+#endif /* USE_CPUSETS */
 }
 
 /*
@@ -307,6 +310,7 @@ int set_cpuset_policy(int tid, SchedPolicy policy)
         break;
     case SP_SYSTEM:
         fd = system_bg_cpuset_fd;
+        boost_fd = system_bg_schedboost_fd;
         break;
     default:
         boost_fd = fd = -1;
@@ -404,7 +408,7 @@ int set_sched_policy(int tid, SchedPolicy policy)
         }
 
 
-        if (fd > 0 && add_tid_to_cgroup(tid, fd) != 0) {
+        if (add_tid_to_cgroup(tid, fd) != 0) {
             if (errno != ESRCH && errno != ENOENT)
                 return -errno;
         }
