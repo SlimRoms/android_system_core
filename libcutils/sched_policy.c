@@ -125,6 +125,7 @@ static void __initialize(void) {
         system_bg_cpuset_fd = open(filename, O_WRONLY | O_CLOEXEC);
         filename = "/dev/cpuset/top-app/tasks";
         ta_cpuset_fd = open(filename, O_WRONLY | O_CLOEXEC);
+    }
 
 #ifdef USE_SCHEDBOOST
     if (!access("/dev/stune/tasks", F_OK)) {
