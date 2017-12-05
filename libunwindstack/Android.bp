@@ -47,12 +47,19 @@ cc_defaults {
 
     srcs: [
         "ArmExidx.cpp",
+        "DwarfCfa.cpp",
+        "DwarfMemory.cpp",
+        "DwarfOp.cpp",
+        "DwarfSection.cpp",
         "Elf.cpp",
         "ElfInterface.cpp",
         "ElfInterfaceArm.cpp",
         "Log.cpp",
         "Regs.cpp",
+        "MapInfo.cpp",
+        "Maps.cpp",
         "Memory.cpp",
+        "Symbols.cpp",
     ],
 
     shared_libs: [
@@ -87,16 +94,26 @@ cc_defaults {
     srcs: [
         "tests/ArmExidxDecodeTest.cpp",
         "tests/ArmExidxExtractTest.cpp",
+        "tests/DwarfCfaLogTest.cpp",
+        "tests/DwarfCfaTest.cpp",
+        "tests/DwarfMemoryTest.cpp",
+        "tests/DwarfOpLogTest.cpp",
+        "tests/DwarfOpTest.cpp",
+        "tests/DwarfSectionTest.cpp",
+        "tests/DwarfSectionImplTest.cpp",
         "tests/ElfInterfaceArmTest.cpp",
         "tests/ElfInterfaceTest.cpp",
         "tests/ElfTest.cpp",
         "tests/LogFake.cpp",
+        "tests/MapInfoTest.cpp",
+        "tests/MapsTest.cpp",
         "tests/MemoryFake.cpp",
         "tests/MemoryFileTest.cpp",
         "tests/MemoryLocalTest.cpp",
         "tests/MemoryRangeTest.cpp",
         "tests/MemoryRemoteTest.cpp",
         "tests/RegsTest.cpp",
+        "tests/SymbolsTest.cpp",
     ],
 
     cflags: [
@@ -107,6 +124,10 @@ cc_defaults {
     shared_libs: [
         "libbase",
         "liblog",
+    ],
+
+    static_libs: [
+        "libgmock",
     ],
 
     target: {

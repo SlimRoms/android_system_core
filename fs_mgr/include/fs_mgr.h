@@ -72,6 +72,7 @@ struct fstab_rec {
     char *fs_options;
     int fs_mgr_flags;
     char *key_loc;
+    char* key_dir;
     char *verity_loc;
     long long length;
     char *label;
@@ -95,6 +96,8 @@ struct fstab *fs_mgr_read_fstab_dt();
 struct fstab *fs_mgr_read_fstab(const char *fstab_path);
 void fs_mgr_free_fstab(struct fstab *fstab);
 
+#define FS_MGR_MNTALL_DEV_IS_METADATA_ENCRYPTED 7
+#define FS_MGR_MNTALL_DEV_NEEDS_METADATA_ENCRYPTION 6
 #define FS_MGR_MNTALL_DEV_FILE_ENCRYPTED 5
 #define FS_MGR_MNTALL_DEV_NEEDS_RECOVERY 4
 #define FS_MGR_MNTALL_DEV_NEEDS_ENCRYPTION 3
@@ -106,14 +109,15 @@ int fs_mgr_mount_all(struct fstab *fstab, int mount_mode);
 
 #define FS_MGR_DOMNT_FAILED (-1)
 #define FS_MGR_DOMNT_BUSY (-2)
+#define FS_MGR_DOMNT_SUCCESS 0
 
 int fs_mgr_do_mount(struct fstab *fstab, const char *n_name, char *n_blk_device,
                     char *tmp_mount_point);
 int fs_mgr_do_mount_one(struct fstab_rec *rec);
 int fs_mgr_do_tmpfs_mount(const char *n_name);
 int fs_mgr_unmount_all(struct fstab *fstab);
-int fs_mgr_get_crypt_info(struct fstab *fstab, char *key_loc,
-                          char *real_blk_device, int size);
+struct fstab_rec const* fs_mgr_get_crypt_entry(struct fstab const* fstab);
+void fs_mgr_get_crypt_info(struct fstab* fstab, char* key_loc, char* real_blk_device, size_t size);
 bool fs_mgr_load_verity_state(int* mode);
 bool fs_mgr_update_verity_state(fs_mgr_verity_state_callback callback);
 int fs_mgr_add_entry(struct fstab *fstab,
@@ -143,6 +147,7 @@ int fs_mgr_swapon_all(struct fstab *fstab);
 
 int fs_mgr_do_format(struct fstab_rec *fstab, bool reserve_footer);
 
+#define FS_MGR_SETUP_VERITY_SKIPPED  (-3)
 #define FS_MGR_SETUP_VERITY_DISABLED (-2)
 #define FS_MGR_SETUP_VERITY_FAIL (-1)
 #define FS_MGR_SETUP_VERITY_SUCCESS 0

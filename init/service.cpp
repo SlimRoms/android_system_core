@@ -24,30 +24,27 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/system_properties.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
 
-#include <selinux/selinux.h>
-
 #include <android-base/file.h>
+#include <android-base/logging.h>
 #include <android-base/parseint.h>
 #include <android-base/properties.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
+#include <processgroup/processgroup.h>
+#include <selinux/selinux.h>
 #include <system/thread_defs.h>
 
-#include <processgroup/processgroup.h>
-
-#include "action.h"
 #include "init.h"
-#include "init_parser.h"
-#include "log.h"
 #include "property_service.h"
 #include "util.h"
 
+using android::base::boot_clock;
 using android::base::ParseInt;
 using android::base::StringPrintf;
 using android::base::WriteStringToFile;
@@ -162,6 +159,7 @@ Service::Service(const std::string& name, const std::vector<std::string>& args)
       gid_(0),
       namespace_flags_(0),
       seclabel_(""),
+      onrestart_(false, "<Service '" + name + "' onrestart>", 0),
       keychord_id_(0),
       ioprio_class_(IoSchedClass_NONE),
       ioprio_pri_(0),
@@ -186,6 +184,7 @@ Service::Service(const std::string& name, unsigned flags, uid_t uid, gid_t gid,
       capabilities_(capabilities),
       namespace_flags_(namespace_flags),
       seclabel_(seclabel),
+      onrestart_(false, "<Service '" + name + "' onrestart>", 0),
       keychord_id_(0),
       ioprio_class_(IoSchedClass_NONE),
       ioprio_pri_(0),
@@ -212,20 +211,21 @@ void Service::NotifyStateChange(const std::string& new_state) const {
 }
 
 void Service::KillProcessGroup(int signal) {
-    LOG(INFO) << "Sending signal " << signal
-              << " to service '" << name_
-              << "' (pid " << pid_ << ") process group...";
-    int r;
-    if (signal == SIGTERM) {
-        r = killProcessGroupOnce(uid_, pid_, signal);
-    } else {
-        r = killProcessGroup(uid_, pid_, signal);
-    }
-    if (r == -1) {
-        PLOG(ERROR) << "killProcessGroup(" << uid_ << ", " << pid_ << ", " << signal << ") failed";
-    }
-    if (kill(-pid_, signal) == -1) {
-        PLOG(ERROR) << "kill(" << pid_ << ", " << signal << ") failed";
+    // If we've already seen a successful result from killProcessGroup*(), then we have removed
+    // the cgroup already and calling these functions a second time will simply result in an error.
+    // This is true regardless of which signal was sent.
+    // These functions handle their own logging, so no additional logging is needed.
+    if (!process_cgroup_empty_) {
+        LOG(INFO) << "Sending signal " << signal << " to service '" << name_ << "' (pid " << pid_
+                  << ") process group...";
+        int r;
+        if (signal == SIGTERM) {
+            r = killProcessGroupOnce(uid_, pid_, signal);
+        } else {
+            r = killProcessGroup(uid_, pid_, signal);
+        }
+
+        if (r == 0) process_cgroup_empty_ = true;
     }
 }
 
@@ -383,9 +383,18 @@ bool Service::ParseDisabled(const std::vector<std::string>& args, std::string* e
 }
 
 bool Service::ParseGroup(const std::vector<std::string>& args, std::string* err) {
-    gid_ = decode_uid(args[1].c_str());
+    std::string decode_uid_err;
+    if (!DecodeUid(args[1], &gid_, &decode_uid_err)) {
+        *err = "Unable to find GID for '" + args[1] + "': " + decode_uid_err;
+        return false;
+    }
     for (std::size_t n = 2; n < args.size(); n++) {
-        supp_gids_.emplace_back(decode_uid(args[n].c_str()));
+        gid_t gid;
+        if (!DecodeUid(args[n], &gid, &decode_uid_err)) {
+            *err = "Unable to find GID for '" + args[n] + "': " + decode_uid_err;
+            return false;
+        }
+        supp_gids_.emplace_back(gid);
     }
     return true;
 }
@@ -441,7 +450,8 @@ bool Service::ParseOneshot(const std::vector<std::string>& args, std::string* er
 
 bool Service::ParseOnrestart(const std::vector<std::string>& args, std::string* err) {
     std::vector<std::string> str_args(args.begin() + 1, args.end());
-    onrestart_.AddCommand(str_args, "", 0, err);
+    int line = onrestart_.NumCommands() + 1;
+    onrestart_.AddCommand(str_args, line, err);
     return true;
 }
 
@@ -479,12 +489,35 @@ bool Service::ParseSetenv(const std::vector<std::string>& args, std::string* err
     return true;
 }
 
+bool Service::ParseShutdown(const std::vector<std::string>& args, std::string* err) {
+    if (args[1] == "critical") {
+        flags_ |= SVC_SHUTDOWN_CRITICAL;
+        return true;
+    }
+    return false;
+}
+
 template <typename T>
 bool Service::AddDescriptor(const std::vector<std::string>& args, std::string* err) {
     int perm = args.size() > 3 ? std::strtoul(args[3].c_str(), 0, 8) : -1;
-    uid_t uid = args.size() > 4 ? decode_uid(args[4].c_str()) : 0;
-    gid_t gid = args.size() > 5 ? decode_uid(args[5].c_str()) : 0;
+    uid_t uid = 0;
+    gid_t gid = 0;
     std::string context = args.size() > 6 ? args[6] : "";
+
+    std::string decode_uid_err;
+    if (args.size() > 4) {
+        if (!DecodeUid(args[4], &uid, &decode_uid_err)) {
+            *err = "Unable to find UID for '" + args[4] + "': " + decode_uid_err;
+            return false;
+        }
+    }
+
+    if (args.size() > 5) {
+        if (!DecodeUid(args[5], &gid, &decode_uid_err)) {
+            *err = "Unable to find GID for '" + args[5] + "': " + decode_uid_err;
+            return false;
+        }
+    }
 
     auto descriptor = std::make_unique<T>(args[1], args[2], uid, gid, perm, context);
 
@@ -503,7 +536,9 @@ bool Service::AddDescriptor(const std::vector<std::string>& args, std::string* e
 
 // name type perm [ uid gid context ]
 bool Service::ParseSocket(const std::vector<std::string>& args, std::string* err) {
-    if (args[2] != "dgram" && args[2] != "stream" && args[2] != "seqpacket") {
+    if (!android::base::StartsWith(args[2], "dgram") &&
+        !android::base::StartsWith(args[2], "stream") &&
+        !android::base::StartsWith(args[2], "seqpacket")) {
         *err = "socket type must be 'dgram', 'stream' or 'seqpacket'";
         return false;
     }
@@ -524,7 +559,11 @@ bool Service::ParseFile(const std::vector<std::string>& args, std::string* err) 
 }
 
 bool Service::ParseUser(const std::vector<std::string>& args, std::string* err) {
-    uid_ = decode_uid(args[1].c_str());
+    std::string decode_uid_err;
+    if (!DecodeUid(args[1], &uid_, &decode_uid_err)) {
+        *err = "Unable to find UID for '" + args[1] + "': " + decode_uid_err;
+        return false;
+    }
     return true;
 }
 
@@ -534,14 +573,14 @@ bool Service::ParseWritepid(const std::vector<std::string>& args, std::string* e
 }
 
 class Service::OptionParserMap : public KeywordMap<OptionParser> {
-public:
-    OptionParserMap() {
-    }
-private:
-    Map& map() const override;
+  public:
+    OptionParserMap() {}
+
+  private:
+    const Map& map() const override;
 };
 
-Service::OptionParserMap::Map& Service::OptionParserMap::map() const {
+const Service::OptionParserMap::Map& Service::OptionParserMap::map() const {
     constexpr std::size_t kMax = std::numeric_limits<std::size_t>::max();
     // clang-format off
     static const Map option_parsers = {
@@ -562,6 +601,7 @@ Service::OptionParserMap::Map& Service::OptionParserMap::map() const {
         {"namespace",   {1,     2,    &Service::ParseNamespace}},
         {"seclabel",    {1,     1,    &Service::ParseSeclabel}},
         {"setenv",      {2,     2,    &Service::ParseSetenv}},
+        {"shutdown",    {1,     1,    &Service::ParseShutdown}},
         {"socket",      {3,     6,    &Service::ParseSocket}},
         {"file",        {2,     2,    &Service::ParseFile}},
         {"user",        {1,     1,    &Service::ParseUser}},
@@ -572,13 +612,8 @@ Service::OptionParserMap::Map& Service::OptionParserMap::map() const {
 }
 
 bool Service::ParseLine(const std::vector<std::string>& args, std::string* err) {
-    if (args.empty()) {
-        *err = "option needed, but not provided";
-        return false;
-    }
-
     static const OptionParserMap parser_map;
-    auto parser = parser_map.FindFunction(args[0], args.size() - 1, err);
+    auto parser = parser_map.FindFunction(args, err);
 
     if (!parser) {
         return false;
@@ -639,7 +674,6 @@ bool Service::Start() {
     if (!seclabel_.empty()) {
         scon = seclabel_;
     } else {
-        LOG(INFO) << "computing context for service '" << name_ << "'";
         scon = ComputeContextFromExecutable(name_, args_[0]);
         if (scon == "") {
             return false;
@@ -744,6 +778,7 @@ bool Service::Start() {
     time_started_ = boot_clock::now();
     pid_ = pid;
     flags_ |= SVC_RUNNING;
+    process_cgroup_empty_ = false;
 
     errno = -createProcessGroup(uid_, pid_);
     if (errno != 0) {
@@ -877,11 +912,6 @@ ServiceManager& ServiceManager::GetInstance() {
 }
 
 void ServiceManager::AddService(std::unique_ptr<Service> service) {
-    Service* old_service = FindServiceByName(service->name());
-    if (old_service) {
-        LOG(ERROR) << "ignored duplicate definition of service '" << service->name() << "'";
-        return;
-    }
     services_.emplace_back(std::move(service));
 }
 
@@ -936,7 +966,9 @@ Service* ServiceManager::MakeExecOneshotService(const std::vector<std::string>& 
     std::vector<std::string> str_args(args.begin() + command_arg, args.end());
 
     exec_count_++;
-    std::string name = StringPrintf("exec %d (%s)", exec_count_, str_args[0].c_str());
+    std::string name =
+        "exec " + std::to_string(exec_count_) + " (" + android::base::Join(str_args, " ") + ")";
+
     unsigned flags = SVC_EXEC | SVC_ONESHOT | SVC_TEMPORARY;
     CapSet no_capabilities;
     unsigned namespace_flags = 0;
@@ -947,15 +979,28 @@ Service* ServiceManager::MakeExecOneshotService(const std::vector<std::string>& 
     }
     uid_t uid = 0;
     if (command_arg > 3) {
-        uid = decode_uid(args[2].c_str());
+        std::string decode_uid_err;
+        if (!DecodeUid(args[2], &uid, &decode_uid_err)) {
+            LOG(ERROR) << "Unable to find UID for '" << args[2] << "': " << decode_uid_err;
+            return nullptr;
+        }
     }
     gid_t gid = 0;
     std::vector<gid_t> supp_gids;
     if (command_arg > 4) {
-        gid = decode_uid(args[3].c_str());
+        std::string decode_uid_err;
+        if (!DecodeUid(args[3], &gid, &decode_uid_err)) {
+            LOG(ERROR) << "Unable to find GID for '" << args[3] << "': " << decode_uid_err;
+            return nullptr;
+        }
         std::size_t nr_supp_gids = command_arg - 1 /* -- */ - 4 /* exec SECLABEL UID GID */;
         for (size_t i = 0; i < nr_supp_gids; ++i) {
-            supp_gids.push_back(decode_uid(args[4 + i].c_str()));
+            gid_t supp_gid;
+            if (!DecodeUid(args[4 + i], &supp_gid, &decode_uid_err)) {
+                LOG(ERROR) << "Unable to find UID for '" << args[4 + i] << "': " << decode_uid_err;
+                return nullptr;
+            }
+            supp_gids.push_back(supp_gid);
         }
     }
 
@@ -1099,8 +1144,17 @@ void ServiceManager::ReapAnyOutstandingChildren() {
     }
 }
 
-bool ServiceParser::ParseSection(const std::vector<std::string>& args,
-                                 std::string* err) {
+void ServiceManager::ClearExecWait() {
+    // Clear EXEC flag if there is one pending
+    // And clear the wait flag
+    for (const auto& s : services_) {
+        s->UnSetExec();
+    }
+    exec_waiter_.reset();
+}
+
+bool ServiceParser::ParseSection(std::vector<std::string>&& args, const std::string& filename,
+                                 int line, std::string* err) {
     if (args.size() < 3) {
         *err = "services must have a name and a program";
         return false;
@@ -1112,20 +1166,24 @@ bool ServiceParser::ParseSection(const std::vector<std::string>& args,
         return false;
     }
 
+    Service* old_service = service_manager_->FindServiceByName(name);
+    if (old_service) {
+        *err = "ignored duplicate definition of service '" + name + "'";
+        return false;
+    }
+
     std::vector<std::string> str_args(args.begin() + 2, args.end());
     service_ = std::make_unique<Service>(name, str_args);
     return true;
 }
 
-bool ServiceParser::ParseLineSection(const std::vector<std::string>& args,
-                                     const std::string& filename, int line,
-                                     std::string* err) const {
-    return service_ ? service_->ParseLine(args, err) : false;
+bool ServiceParser::ParseLineSection(std::vector<std::string>&& args, int line, std::string* err) {
+    return service_ ? service_->ParseLine(std::move(args), err) : false;
 }
 
 void ServiceParser::EndSection() {
     if (service_) {
-        ServiceManager::GetInstance().AddService(std::move(service_));
+        service_manager_->AddService(std::move(service_));
     }
 }
 

@@ -7,6 +7,10 @@
 dir.system = /system/bin/
 dir.system = /system/xbin/
 dir.vendor = /vendor/bin/
+dir.test = /data/nativetest/
+dir.test = /data/nativetest64/
+dir.test = /data/benchmarktest/
+dir.test = /data/benchmarktest64/
 
 [system]
 additional.namespaces = sphal,vndk,rs
@@ -63,7 +67,7 @@ namespace.sphal.links = default,vndk,rs
 namespace.sphal.link.default.shared_libs = libc.so:libz.so:libm.so:libdl.so:libstdc++.so:liblog.so:libnativewindow.so:libEGL.so:libsync.so:libGLESv1_CM.so:libGLESv2.so:libvndksupport.so
 
 # WARNING: only VNDK-SP libs can be listed here. DO NOT EDIT this line.
-namespace.sphal.link.vndk.shared_libs = android.hardware.renderscript@1.0.so:android.hardware.graphics.allocator@2.0.so:android.hardware.graphics.mapper@2.0.so:android.hardware.graphics.common@1.0.so:android.hidl.base@1.0.so:android.hidl.memory@1.0.so:libhwbinder.so:libbase.so:libcutils.so:libhardware.so:libhidlbase.so:libhidlmemory.so:libhidltransport.so:libion.so:libutils.so:libc++.so
+namespace.sphal.link.vndk.shared_libs = android.hardware.renderscript@1.0.so:android.hardware.graphics.allocator@2.0.so:android.hardware.graphics.mapper@2.0.so:android.hardware.graphics.common@1.0.so:android.hidl.memory@1.0.so:libhwbinder.so:libbase.so:libcutils.so:libhardware.so:libhidlbase.so:libhidlmemory.so:libhidltransport.so:libion.so:libutils.so:libc++.so
 
 # Renderscript gets separate namespace
 namespace.sphal.link.rs.shared_libs = libRS_internal.so
@@ -84,8 +88,8 @@ namespace.rs.asan.search.paths = /data/asan/vendor/${LIB}/vndk-sp:/vendor/${LIB}
 namespace.rs.asan.permitted.paths = /data/asan/vendor/${LIB}:/vendor/${LIB}:/data
 
 namespace.rs.links = default,vndk
-namespace.rs.link.default.shared_libs = libc.so:libz.so:libm.so:libdl.so:libstdc++.so:liblog.so:libnativewindow.so:libEGL.so:libsync.so:libGLESv1_CM.so:libGLESv2.so:libmediandk.so:libui.so:libvndksupport.so
-namespace.rs.link.vndk.shared_libs = android.hardware.renderscript@1.0.so:android.hardware.graphics.allocator@2.0.so:android.hardware.graphics.mapper@2.0.so:android.hardware.graphics.common@1.0.so:android.hidl.base@1.0.so:android.hidl.memory@1.0.so:libhwbinder.so:libbase.so:libcutils.so:libhardware.so:libhidlbase.so:libhidlmemory.so:libhidltransport.so:libion.so:libutils.so:libc++.so
+namespace.rs.link.default.shared_libs = libc.so:libz.so:libm.so:libdl.so:libstdc++.so:liblog.so:libnativewindow.so:libEGL.so:libsync.so:libGLESv1_CM.so:libGLESv2.so:libmediandk.so:libvndksupport.so
+namespace.rs.link.vndk.shared_libs = android.hardware.renderscript@1.0.so:android.hardware.graphics.allocator@2.0.so:android.hardware.graphics.mapper@2.0.so:android.hardware.graphics.common@1.0.so:android.hidl.memory@1.0.so:libhwbinder.so:libbase.so:libcutils.so:libhardware.so:libhidlbase.so:libhidlmemory.so:libhidltransport.so:libion.so:libutils.so:libc++.so
 
 ###############################################################################
 # "vndk" namespace
@@ -105,8 +109,22 @@ namespace.vndk.asan.permitted.paths = /data/asan/vendor/${LIB}/hw:/vendor/${LIB}
 namespace.vndk.links = default
 namespace.vndk.link.default.shared_libs = android.hidl.memory@1.0-impl.so:libc.so:libz.so:libm.so:libdl.so:libstdc++.so:liblog.so:libnativewindow.so:libEGL.so:libsync.so:libvndksupport.so
 
-
+###############################################################################
+# Namespace config for vendor processes. In O, no restriction is enforced for
+# them. However, in O-MR1, access to /system/${LIB} will not be allowed to
+# the default namespace. 'system' namespace will be added to give limited
+# (LL-NDK only) access.
+###############################################################################
 [vendor]
+namespace.default.isolated = false
+namespace.default.search.paths = /vendor/${LIB}:/vendor/${LIB}/vndk-sp:/system/${LIB}/vndk-sp:/system/${LIB}
+
+namespace.default.asan.search.paths = /data/asan/vendor/${LIB}:/vendor/${LIB}:/data/asan/vendor/${LIB}/vndk-sp:/vendor/${LIB}/vndk-sp:/data/asan/system/${LIB}/vndk-sp:/system/${LIB}/vndk-sp:/data/asan/system/${LIB}:/system/${LIB}
+
+###############################################################################
+# Namespace config for tests. No VNDK restriction is enforced for these tests.
+###############################################################################
+[test]
 namespace.default.isolated = false
 namespace.default.search.paths = /vendor/${LIB}:/vendor/${LIB}/vndk-sp:/system/${LIB}/vndk-sp:/system/${LIB}
 
