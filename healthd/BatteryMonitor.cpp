@@ -361,7 +361,7 @@ bool BatteryMonitor::update(void) {
                  props.chargerUsbOnline ? "u" : "",
                  props.chargerWirelessOnline ? "w" : "");
 
-        KLOG_WARNING(LOG_TAG, "%s\n", dmesgline);
+        KLOG_DEBUG(LOG_TAG, "%s\n", dmesgline);
     }
 
     healthd_mode_ops->battery_update(&props);
