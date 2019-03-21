@@ -879,18 +879,34 @@ int fs_mgr_add_entry(struct fstab *fstab,
 }
 
 /*
- * Returns the fstab_rec* whose mount_point is path.
- * Returns nullptr if not found.
+ * Returns the 1st matching fstab_rec that follows the start_rec.
+ * start_rec is the result of a previous search or NULL.
  */
-struct fstab_rec* fs_mgr_get_entry_for_mount_point(struct fstab* fstab, const std::string& path) {
+struct fstab_rec* fs_mgr_get_entry_for_mount_point_after(struct fstab_rec* start_rec,
+                                                         struct fstab* fstab,
+                                                         const std::string& path) {
+    int i;
     if (!fstab) {
         return nullptr;
     }
-    for (int i = 0; i < fstab->num_entries; i++) {
+
+    if (start_rec) {
+        for (i = 0; i < fstab->num_entries; i++) {
+            if (&fstab->recs[i] == start_rec) {
+                i++;
+                break;
+            }
+        }
+    } else {
+        i = 0;
+    }
+
+    for (; i < fstab->num_entries; i++) {
         if (fstab->recs[i].mount_point && path == fstab->recs[i].mount_point) {
             return &fstab->recs[i];
         }
     }
+
     return nullptr;
 }
 
@@ -909,6 +925,16 @@ std::set<std::string> fs_mgr_get_boot_devices() {
     if (fstab) return extract_boot_devices(*fstab);
 
     return {};
+}
+
+/*
+ * Returns the 1st matching mount point.
+ * There might be more. To look for others, use fs_mgr_get_entry_for_mount_point_after()
+ * and give the fstab_rec from the previous search.
+ */
+struct fstab_rec *fs_mgr_get_entry_for_mount_point(struct fstab* fstab, const std::string& path)
+{
+    return fs_mgr_get_entry_for_mount_point_after(NULL, fstab, path);
 }
 
 int fs_mgr_is_voldmanaged(const struct fstab_rec *fstab)
