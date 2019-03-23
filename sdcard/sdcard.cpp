@@ -213,7 +213,7 @@ static int usage() {
     return 1;
 }
 
-extern "C" int sdcard_main(int argc, char **argv) {
+int main(int argc, char **argv) {
     const char *source_path = NULL;
     const char *label = NULL;
     uid_t uid = 0;
