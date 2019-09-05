@@ -1,0 +1,90 @@
+premaca@BlackMamba:/shared/Android/BFG$ java -jar bfg.jar --strip-blobs-bigger-than 100M core
+
+Using repo : /shared/Android/BFG/core/.git
+
+Scanning packfile for large blobs: 160100
+Scanning packfile for large blobs completed in 844 ms.
+Found 1 blob ids for large blobs - biggest=229696508 smallest=229696508
+Total size (unpacked)=229696508
+Found 1956 objects to protect
+Found 764 tag-pointing refs : refs/tags/afw-test-harness-1.5, refs/tags/afw-test-harness-2.1, refs/tags/android-1.6_r1, ...
+Found 205 commit-pointing refs : HEAD, refs/heads/10.0, refs/remotes/origin/HEAD, ...
+
+Protected commits
+-----------------
+
+These are your protected commits, and so their contents will NOT be altered:
+
+ * commit 5aa0e424 (protected by 'HEAD')
+
+Cleaning
+--------
+
+Found 53800 commits
+Cleaning commits:       100% (53800/53800)
+Cleaning commits completed in 4,844 ms.
+
+Updating 148 Refs
+-----------------
+
+	Ref                                                      Before     After
+	----------------------------------------------------------------------------
+	refs/heads/10.0                                        | 5aa0e424 | fbdf5bca
+	refs/remotes/origin/android10-dev                      | ac9e2af1 | 93a76cef
+	refs/remotes/origin/android10-mainline-release         | ddd75ba1 | 3d99b2f2
+	refs/remotes/origin/android10-release                  | 5aa0e424 | fbdf5bca
+	refs/remotes/origin/master                             | 8bea4258 | 322c734c
+	refs/remotes/origin/master-cuttlefish-testing-release  | fd088948 | d2bc509e
+	refs/remotes/origin/nougat-iot-release                 | 044e0276 | f59b7053
+	refs/remotes/origin/o-mr1-iot-preview-7                | 2b49abe4 | 8ff6ed0b
+	refs/remotes/origin/o-mr1-iot-preview-8                | 22dc27b9 | d752133b
+	refs/remotes/origin/oreo-mr1-1.2-iot-release           | c53a0e91 | 55314112
+	refs/remotes/origin/oreo-mr1-iot-release               | eabbfb9e | 19891971
+	refs/remotes/origin/pie-b4s4-dev                       | f11c98bc | c83d71bf
+	refs/remotes/origin/pie-b4s4-release                   | 4ac32f8c | 88002cb0
+	refs/remotes/origin/pie-cts-dev                        | 2ef5c2ef | a7457893
+	refs/remotes/origin/pie-cts-release                    | bfe37429 | ef743cb7
+	...
+
+Updating references:    100% (148/148)
+...Ref update completed in 47 ms.
+
+Commit Tree-Dirt History
+------------------------
+
+	Earliest                                              Latest
+	|                                                          |
+	.............................................Dmmmmmmmmmmmmmm
+
+	D = dirty commits (file tree fixed)
+	m = modified commits (commit message or parents changed)
+	. = clean commits (no changes to file tree)
+
+	                        Before     After
+	-------------------------------------------
+	First modified commit | 150db124 | ecbcdafc
+	Last dirty commit     | e242a97d | cd89e6b1
+
+Deleted files
+-------------
+
+	Filename     Git id
+	--------------------------------
+	libartd.so | 70352dbb (219.1 MB)
+
+
+In total, 13783 object ids were changed. Full details are logged here:
+
+	/shared/Android/BFG/core.bfg-report/2019-09-06/00-12-42
+
+BFG run is complete! When ready, run: git reflog expire --expire=now --all && git gc --prune=now --aggressive
+
+
+--
+You can rewrite history in Git - don't let Trump do it for real!
+Trump's administration has lied consistently, to make people give up on ever
+being told the truth. Don't give up: https://www.rescue.org/topic/refugees-america
+--
+
+
+premaca@BlackMamba:/shared/Android/BFG$
